@@ -1,0 +1,56 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+import { DatabaseModule } from './infrastructure/database/database.module';
+import { SecurityModule } from './infrastructure/security/security.module';
+import { RedisModule } from './infrastructure/cache/redis.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
+import { ThrottlerModule } from './infrastructure/throttler/throttler.module';
+import { UsersModule } from './presentation/http/users.module';
+import { AuthModule } from './presentation/http/auth.module';
+import { StudentsModule } from './presentation/http/students.module';
+import { DocumentsModule } from './presentation/http/documents.module';
+import { PaymentsModule } from './presentation/http/payments.module';
+import { ReportsModule } from './presentation/http/reports.module';
+import { ApplicationsModule } from './presentation/http/applications.module';
+import { CurriculumModule } from './presentation/http/curriculum.module';
+import { GradesModule } from './presentation/http/grades.module';
+import { ContextModule } from './infrastructure/context/context.module';
+import { NotificationsModule } from './infrastructure/notifications/notifications.module';
+import { BootstrapModule } from './infrastructure/bootstrap/bootstrap.module';
+import { HealthController } from './presentation/http/controllers/health.controller';
+import { JwtAuthGuard } from './presentation/http/auth/jwt-auth.guard';
+import { RolesGuard } from './presentation/http/auth/roles.guard';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    DatabaseModule,
+    RedisModule,
+    ThrottlerModule,
+    SecurityModule,
+    StorageModule,
+    QueueModule,
+    ContextModule,
+    NotificationsModule,
+    AuthModule,
+    UsersModule,
+    StudentsModule,
+    DocumentsModule,
+    PaymentsModule,
+    ReportsModule,
+    ApplicationsModule,
+    CurriculumModule,
+    GradesModule,
+    BootstrapModule,
+  ],
+  controllers: [HealthController],
+  providers: [
+    // Порядок: сначала JWT (кроме @Public), затем RBAC по ролям.
+    // ThrottlerGuard регистрируется в ThrottlerModule.
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
+})
+export class AppModule {}
