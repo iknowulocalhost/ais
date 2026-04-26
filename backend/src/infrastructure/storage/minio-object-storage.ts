@@ -11,7 +11,7 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   constructor(cfg: ConfigService) {
     this.client = new MinioClient({
       endPoint: cfg.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: cfg.get<number>('MINIO_PORT', 9000),
+      port: Number(cfg.get<string | number>('MINIO_PORT', 9000)),
       useSSL: cfg.get<string>('MINIO_USE_SSL', 'false') === 'true',
       accessKey: cfg.getOrThrow<string>('MINIO_ACCESS_KEY'),
       secretKey: cfg.getOrThrow<string>('MINIO_SECRET_KEY'),
