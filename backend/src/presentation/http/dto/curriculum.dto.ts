@@ -8,6 +8,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // ── Disciplines ─────────────────────────────────────────
 
@@ -25,6 +26,12 @@ export class CreateDisciplineDto {
 export class ListDisciplinesQueryDto {
   @IsOptional() @IsString()
   search?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
 }
 
 // ── Curriculum Plans ────────────────────────────────────
@@ -46,11 +53,17 @@ export class ListCurriculumPlansQueryDto {
   @IsOptional() @IsString()
   programCode?: string;
 
-  @IsOptional() @IsInt()
+  @IsOptional() @Type(() => Number) @IsInt()
   admissionYear?: number;
 
   @IsOptional() @IsEnum(PLAN_STATUSES)
   status?: (typeof PLAN_STATUSES)[number];
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
 }
 
 // ── Curriculum Entries ──────────────────────────────────

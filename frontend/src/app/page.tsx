@@ -16,8 +16,13 @@ export default function RootPage() {
   }, [loading, user, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center text-slate-500">
-      Перенаправляем…
+    <div
+      className="flex h-screen items-center justify-center"
+      style={{ background: 'var(--ais-ink)', color: 'var(--ais-bone-3)' }}
+    >
+      <span className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        перенаправляем…
+      </span>
     </div>
   );
 }

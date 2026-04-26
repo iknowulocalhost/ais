@@ -2,10 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
+/* ───────────────────────────────────────────────────────────────────
+ * АИС:Студент — Design System
+ *   tokens.css       — палитра, типографика, spacing (4px), радиусы, тени
+ *   components.css   — классы .btn / .card / .field / .badge / .grade / ...
+ * Полная система — см. файлы в /src/styles/design-system.
+ * ─────────────────────────────────────────────────────────────────── */
+@import '../styles/design-system/tokens.css';
+@import '../styles/design-system/components.css';
+
+html, body { height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+*:focus-visible {
+  outline: 2px solid var(--ais-forest);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
+
+input, textarea, select, button { font: inherit; color: inherit; }

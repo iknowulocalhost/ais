@@ -37,6 +37,12 @@ export class ListGradeSheetsQueryDto {
 
   @IsOptional() @IsEnum(SHEET_STATUSES)
   status?: (typeof SHEET_STATUSES)[number];
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
 }
 
 // ── Grades ──────────────────────────────────────────────

@@ -4,15 +4,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Protected } from '@/components/protected';
 import { apiFetch } from '@/lib/api';
+import { explainError } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   fmtDate,
-  GRADE_SHEET_STATUS_COLORS,
   GRADE_SHEET_STATUS_LABELS,
   GRADE_VALUE_LABELS,
   type Grade,
   type GradeSheet,
+  type GradeSheetStatus,
 } from '@/lib/domain';
+
+const SHEET_STATUS_VARIANT: Record<GradeSheetStatus, string> = {
+  OPEN: 'badge--warn',
+  CLOSED: 'badge--ok',
+};
+
+const GRADE_CLASS: Record<number, string> = {
+  0: 'grade grade--n',
+  1: 'grade grade--3',
+  2: 'grade grade--2',
+  3: 'grade grade--3',
+  4: 'grade grade--4',
+  5: 'grade grade--5',
+};
 
 export default function GradeSheetDetailPage() {
   return (
@@ -42,7 +57,7 @@ function GradeSheetDetail() {
       setSheet(s);
       setGrades(g);
     } catch (e) {
-      setError((e as Error).message);
+      setError(explainError(e).hint);
     }
   }, [id]);
 
@@ -89,7 +104,7 @@ function GradeSheetDetail() {
       setEditing(new Map());
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(explainError(e).hint);
     } finally {
       setSaving(false);
     }
@@ -101,30 +116,29 @@ function GradeSheetDetail() {
       await apiFetch(`/api/grades/sheets/${id}/close`, { method: 'POST' });
       await load();
     } catch (e) {
-      alert((e as Error).message);
+      alert(explainError(e).hint);
     }
   }
 
-  if (error && !sheet) return <div className="rounded bg-red-50 p-4 text-sm text-red-700">{error}</div>;
-  if (!sheet) return <div className="text-slate-500">Загрузка…</div>;
+  if (error && !sheet) return <div className="callout callout--danger"><span>{error}</span></div>;
+  if (!sheet) return <div className="muted">Загрузка…</div>;
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-lg bg-white p-6 ring-1 ring-slate-200">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Ведомость</h1>
-            <p className="mt-1 text-sm text-slate-500">
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      <header className="card">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--s-4)' }}>
+          <div className="col" style={{ gap: 'var(--s-1)' }}>
+            <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Ведомость</h1>
+            <p className="mono muted" style={{ fontSize: 'var(--fs-13)' }}>
               Дата: {fmtDate(sheet.date)} · ID: {sheet.id.slice(0, 8)}…
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full px-3 py-1 text-sm ${GRADE_SHEET_STATUS_COLORS[sheet.status]}`}>
+          <div className="row" style={{ gap: 'var(--s-2)', alignItems: 'center' }}>
+            <span className={`badge ${SHEET_STATUS_VARIANT[sheet.status]}`}>
               {GRADE_SHEET_STATUS_LABELS[sheet.status]}
             </span>
             {canClose && (
-              <button onClick={closeSheet}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
+              <button onClick={closeSheet} className="btn btn--primary btn--sm">
                 Закрыть ведомость
               </button>
             )}
@@ -132,62 +146,67 @@ function GradeSheetDetail() {
         </div>
       </header>
 
-      {error && <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="callout callout--danger"><span>{error}</span></div>}
 
-      <section className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Оценки ({grades.length})</h2>
+      <section className="card">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="display" style={{ fontSize: 'var(--fs-20)' }}>
+            Оценки <span className="mono muted tnum">({grades.length})</span>
+          </h2>
           {canSubmit && editing.size > 0 && (
             <button
               onClick={() => void submitGrades()}
               disabled={saving}
-              className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn--primary btn--sm"
             >
               {saving ? 'Сохраняем…' : `Сохранить (${editing.size})`}
             </button>
           )}
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-md ring-1 ring-slate-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
+        <div className="card card--bleed" style={{ marginTop: 'var(--s-3)' }}>
+          <table className="table">
+            <thead>
               <tr>
-                <th className="px-3 py-2 font-medium">Студент</th>
-                <th className="px-3 py-2 font-medium">Оценка</th>
-                <th className="px-3 py-2 font-medium">Комментарий</th>
-                {canSubmit && <th className="px-3 py-2"></th>}
+                <th>Студент</th>
+                <th>Оценка</th>
+                <th>Комментарий</th>
+                {canSubmit && <th></th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {grades.map((g) => {
                 const ed = editing.get(g.id);
                 return (
                   <tr key={g.id}>
-                    <td className="px-3 py-2 text-slate-700">{g.studentId.slice(0, 8)}…</td>
-                    <td className="px-3 py-2">
+                    <td className="mono muted">{g.studentId.slice(0, 8)}…</td>
+                    <td>
                       {ed ? (
                         <select
                           value={ed.value}
                           onChange={(e) => updateEdit(g.id, 'value', e.target.value)}
-                          className="rounded-md border border-slate-300 px-2 py-0.5 text-sm"
+                          className="input"
+                          style={{ width: 'auto' }}
                         >
                           <option value="">—</option>
                           {[0, 1, 2, 3, 4, 5].map((v) => (
                             <option key={v} value={v}>{v} — {GRADE_VALUE_LABELS[v]}</option>
                           ))}
                         </select>
-                      ) : (
-                        <span className={g.value !== null ? 'font-medium' : 'text-slate-400'}>
-                          {g.value !== null ? `${g.value} — ${GRADE_VALUE_LABELS[g.value] ?? ''}` : 'Не выставлена'}
+                      ) : g.value !== null ? (
+                        <span className={GRADE_CLASS[g.value]}>
+                          {g.value} · {GRADE_VALUE_LABELS[g.value] ?? ''}
                         </span>
+                      ) : (
+                        <span className="muted">Не выставлена</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">
+                    <td className="muted">
                       {ed ? (
                         <input
                           value={ed.comment}
                           onChange={(e) => updateEdit(g.id, 'comment', e.target.value)}
-                          className="w-full rounded-md border border-slate-300 px-2 py-0.5 text-sm"
+                          className="input"
                           placeholder="Комментарий"
                         />
                       ) : (
@@ -195,15 +214,16 @@ function GradeSheetDetail() {
                       )}
                     </td>
                     {canSubmit && (
-                      <td className="px-3 py-2 text-right">
+                      <td style={{ textAlign: 'right' }}>
                         {!ed ? (
-                          <button onClick={() => startEdit(g)}
-                            className="text-xs text-blue-700 hover:underline">
+                          <button onClick={() => startEdit(g)} className="btn btn--ghost btn--sm">
                             Редактировать
                           </button>
                         ) : (
-                          <button onClick={() => setEditing((prev) => { const n = new Map(prev); n.delete(g.id); return n; })}
-                            className="text-xs text-slate-500 hover:underline">
+                          <button
+                            onClick={() => setEditing((prev) => { const n = new Map(prev); n.delete(g.id); return n; })}
+                            className="btn btn--ghost btn--sm"
+                          >
                             Отмена
                           </button>
                         )}
@@ -213,7 +233,11 @@ function GradeSheetDetail() {
                 );
               })}
               {grades.length === 0 && (
-                <tr><td colSpan={canSubmit ? 4 : 3} className="px-3 py-4 text-center text-slate-500">Нет студентов</td></tr>
+                <tr>
+                  <td colSpan={canSubmit ? 4 : 3} className="muted" style={{ textAlign: 'center', padding: 'var(--s-6)' }}>
+                    Нет студентов
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

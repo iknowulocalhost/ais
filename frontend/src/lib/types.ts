@@ -43,14 +43,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   STU: 'Студент',
 };
 
-/** Для ролевого «главного» раздела после логина. */
-export function homePathForRoles(roles: Role[]): string {
-  if (roles.includes('SUPERADMIN') || roles.includes('ADM')) return '/admin/users';
-  if (roles.includes('COM')) return '/applications';
-  if (roles.includes('ACC')) return '/payments';
-  if (roles.includes('ANA')) return '/reports';
-  if (roles.includes('STU')) return '/me';
-  return '/me';
+/**
+ * Все роли после логина попадают на единую «Сводку» (/dashboard),
+ * которая сама подстраивается под роль. До версии 0.1 была ролевая «домашняя» —
+ * отказались в пользу общей опорной точки (DESIGN.md §5).
+ */
+export function homePathForRoles(_roles: Role[]): string {
+  return '/dashboard';
 }
 
 export function hasAnyRole(user: AuthUser | null, required: Role[]): boolean {

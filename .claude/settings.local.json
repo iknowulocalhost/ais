@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/api/health)",
+      "Bash(docker restart *)",
+      "Bash(docker exec *)",
+      "Bash(npm install *)",
+      "Bash(npx next *)",
+      "Bash(python -c ' *)",
+      "PowerShell(cd C:\\\\Users\\\\filatkinaa\\\\ais\\\\backend; if \\(!\\(Test-Path node_modules\\)\\) { npm install 2>&1 | Select-Object -Last 5 }; npx tsc --noEmit 2>&1 | Select-Object -First 40)"
     ]
   }
 }

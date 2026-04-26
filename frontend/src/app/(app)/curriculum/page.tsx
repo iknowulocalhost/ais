@@ -4,15 +4,21 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Protected } from '@/components/protected';
 import { apiFetch } from '@/lib/api';
+import { explainError } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
-  CURRICULUM_PLAN_STATUS_COLORS,
   CURRICULUM_PLAN_STATUS_LABELS,
   type CurriculumPlan,
   type CurriculumPlanStatus,
 } from '@/lib/domain';
 
 interface Page { items: CurriculumPlan[]; total: number }
+
+const PLAN_STATUS_VARIANT: Record<CurriculumPlanStatus, string> = {
+  DRAFT: '',
+  ACTIVE: 'badge--ok',
+  ARCHIVED: 'badge--bad',
+};
 
 export default function CurriculumPage() {
   return (
@@ -38,24 +44,25 @@ function CurriculumList() {
       });
       setData(d);
     } catch (e) {
-      setError((e as Error).message);
+      setError(explainError(e).hint);
     }
   }, [status]);
 
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Учебные планы</h1>
-          {data && <p className="text-sm text-slate-500">Всего: {data.total}</p>}
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      <header className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="col" style={{ gap: 'var(--s-1)' }}>
+          <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Учебные планы</h1>
+          {data && <p className="mono muted" style={{ fontSize: 'var(--fs-13)' }}>Всего: <span className="tnum">{data.total}</span></p>}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="row" style={{ gap: 'var(--s-3)', alignItems: 'center' }}>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as CurriculumPlanStatus | '')}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="input"
+            style={{ width: 'auto' }}
           >
             <option value="">Все статусы</option>
             {(Object.keys(CURRICULUM_PLAN_STATUS_LABELS) as CurriculumPlanStatus[]).map((s) => (
@@ -63,52 +70,53 @@ function CurriculumList() {
             ))}
           </select>
           {canCreate && (
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
+            <button onClick={() => setShowForm((v) => !v)} className="btn btn--primary btn--sm">
               {showForm ? 'Отмена' : 'Создать план'}
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {error && <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="callout callout--danger"><span>{error}</span></div>}
 
       {showForm && <CreatePlanForm onDone={() => { setShowForm(false); void load(); }} />}
 
       {!data ? (
-        <div className="text-slate-500">Загрузка…</div>
+        <div className="muted">Загрузка…</div>
       ) : (
-        <div className="overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
+        <div className="card card--bleed">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="px-4 py-2 font-medium">Название</th>
-                <th className="px-4 py-2 font-medium">Программа</th>
-                <th className="px-4 py-2 font-medium">Год набора</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
+                <th>Название</th>
+                <th>Программа</th>
+                <th>Год набора</th>
+                <th>Статус</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {data.items.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2">
-                    <Link href={`/curriculum/${p.id}`} className="text-blue-700 hover:underline">
+                <tr key={p.id}>
+                  <td>
+                    <Link href={`/curriculum/${p.id}`} style={{ color: 'var(--ais-forest-hi)' }}>
                       {p.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-slate-700">{p.programCode}</td>
-                  <td className="px-4 py-2 text-slate-700">{p.admissionYear}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${CURRICULUM_PLAN_STATUS_COLORS[p.status]}`}>
+                  <td className="mono">{p.programCode}</td>
+                  <td className="mono tnum">{p.admissionYear}</td>
+                  <td>
+                    <span className={`badge ${PLAN_STATUS_VARIANT[p.status]}`}>
                       {CURRICULUM_PLAN_STATUS_LABELS[p.status]}
                     </span>
                   </td>
                 </tr>
               ))}
               {data.items.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">Нет учебных планов</td></tr>
+                <tr>
+                  <td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 'var(--s-6)' }}>
+                    Нет учебных планов
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -136,35 +144,32 @@ function CreatePlanForm({ onDone }: { onDone: () => void }) {
       });
       onDone();
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(explainError(e).hint);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="rounded-md bg-slate-50 p-4 ring-1 ring-slate-200 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <label className="block text-sm">
-        Код программы
+    <form onSubmit={submit} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--s-3)' }}>
+      <label className="field">
+        <span className="field__label">Код программы</span>
         <input value={programCode} onChange={(e) => setProgramCode(e.target.value)} required
-          placeholder="09.02.07"
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          placeholder="09.02.07" className="input" />
       </label>
-      <label className="block text-sm">
-        Год набора
+      <label className="field">
+        <span className="field__label">Год набора</span>
         <input type="number" value={admissionYear} onChange={(e) => setAdmissionYear(e.target.value)} required
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          className="input" />
       </label>
-      <label className="block text-sm">
-        Название
+      <label className="field">
+        <span className="field__label">Название</span>
         <input value={name} onChange={(e) => setName(e.target.value)} required
-          placeholder="УП 09.02.07 набор 2024"
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          placeholder="УП 09.02.07 набор 2024" className="input" />
       </label>
-      {err && <div className="sm:col-span-3 rounded bg-red-50 p-2 text-sm text-red-700">{err}</div>}
-      <div className="sm:col-span-3 flex justify-end">
-        <button disabled={busy}
-          className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+      {err && <div className="callout callout--danger" style={{ gridColumn: '1 / -1' }}><span>{err}</span></div>}
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+        <button disabled={busy} className="btn btn--primary">
           {busy ? 'Создаём…' : 'Создать'}
         </button>
       </div>

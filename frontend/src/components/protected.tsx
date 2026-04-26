@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import type { Role } from '@/lib/types';
 
 interface ProtectedProps {
-  roles?: Role[]; // если пусто — просто требуется вход
+  roles?: Role[];
   children: React.ReactNode;
 }
 
@@ -25,18 +25,27 @@ export function Protected({ roles, children }: ProtectedProps) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-slate-500">
-        Загрузка…
+      <div
+        style={{
+          minHeight: '60vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span className="mono muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          загрузка…
+        </span>
       </div>
     );
   }
   if (!user) return null;
   if (roles && roles.length > 0 && !hasRole(roles)) {
     return (
-      <div className="mx-auto max-w-xl p-8 text-center">
-        <h1 className="text-2xl font-semibold">Недостаточно прав</h1>
-        <p className="mt-2 text-slate-500">
-          Требуется одна из ролей: {roles.join(', ')}.
+      <div className="col" style={{ maxWidth: 560, margin: '0 auto', padding: 'var(--s-7)', gap: 'var(--s-3)', textAlign: 'center' }}>
+        <h1 className="display" style={{ fontSize: 'var(--fs-24)' }}>Недостаточно прав</h1>
+        <p className="muted" style={{ fontSize: 'var(--fs-14)' }}>
+          Требуется одна из ролей: <span className="mono">{roles.join(', ')}</span>.
         </p>
       </div>
     );

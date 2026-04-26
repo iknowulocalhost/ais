@@ -4,16 +4,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Protected } from '@/components/protected';
 import { apiFetch } from '@/lib/api';
+import { explainError } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   CONTROL_FORM_LABELS,
-  CURRICULUM_PLAN_STATUS_COLORS,
   CURRICULUM_PLAN_STATUS_LABELS,
   type ControlForm,
   type CurriculumEntry,
   type CurriculumPlan,
+  type CurriculumPlanStatus,
   type Discipline,
 } from '@/lib/domain';
+
+const PLAN_STATUS_VARIANT: Record<CurriculumPlanStatus, string> = {
+  DRAFT: '',
+  ACTIVE: 'badge--ok',
+  ARCHIVED: 'badge--bad',
+};
 
 export default function CurriculumDetailPage() {
   return (
@@ -46,7 +53,7 @@ function CurriculumDetail() {
       setEntries(e);
       setDisciplines(d.items);
     } catch (e) {
-      setError((e as Error).message);
+      setError(explainError(e).hint);
     }
   }, [id]);
 
@@ -54,7 +61,6 @@ function CurriculumDetail() {
 
   const discMap = new Map(disciplines.map((d) => [d.id, d]));
 
-  // Группируем записи по семестрам
   const bySemester = new Map<number, CurriculumEntry[]>();
   for (const e of entries) {
     const arr = bySemester.get(e.semester) ?? [];
@@ -68,7 +74,7 @@ function CurriculumDetail() {
       await apiFetch(`/api/curriculum/plans/${id}/${action}`, { method: 'POST' });
       await load();
     } catch (e) {
-      alert((e as Error).message);
+      alert(explainError(e).hint);
     }
   }
 
@@ -78,36 +84,34 @@ function CurriculumDetail() {
       await apiFetch(`/api/curriculum/plans/${id}/entries/${entryId}`, { method: 'DELETE' });
       await load();
     } catch (e) {
-      alert((e as Error).message);
+      alert(explainError(e).hint);
     }
   }
 
-  if (error) return <div className="rounded bg-red-50 p-4 text-sm text-red-700">{error}</div>;
-  if (!plan) return <div className="text-slate-500">Загрузка…</div>;
+  if (error) return <div className="callout callout--danger"><span>{error}</span></div>;
+  if (!plan) return <div className="muted">Загрузка…</div>;
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-lg bg-white p-6 ring-1 ring-slate-200">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">{plan.name}</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Программа: {plan.programCode} · Год: {plan.admissionYear}
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      <header className="card">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--s-4)' }}>
+          <div className="col" style={{ gap: 'var(--s-1)' }}>
+            <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>{plan.name}</h1>
+            <p className="mono muted" style={{ fontSize: 'var(--fs-13)' }}>
+              Программа: {plan.programCode} · Год: <span className="tnum">{plan.admissionYear}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full px-3 py-1 text-sm ${CURRICULUM_PLAN_STATUS_COLORS[plan.status]}`}>
+          <div className="row" style={{ gap: 'var(--s-2)', alignItems: 'center' }}>
+            <span className={`badge ${PLAN_STATUS_VARIANT[plan.status]}`}>
               {CURRICULUM_PLAN_STATUS_LABELS[plan.status]}
             </span>
             {canEdit && plan.status === 'DRAFT' && (
-              <button onClick={() => doAction('activate')}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
+              <button onClick={() => doAction('activate')} className="btn btn--primary btn--sm">
                 Активировать
               </button>
             )}
             {canEdit && plan.status === 'ACTIVE' && (
-              <button onClick={() => doAction('archive')}
-                className="rounded-md bg-rose-600 px-3 py-1.5 text-xs text-white hover:bg-rose-700">
+              <button onClick={() => doAction('archive')} className="btn btn--danger btn--sm">
                 В архив
               </button>
             )}
@@ -115,16 +119,13 @@ function CurriculumDetail() {
         </div>
       </header>
 
-      <section className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            Дисциплины ({entries.length})
+      <section className="card">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="display" style={{ fontSize: 'var(--fs-20)' }}>
+            Дисциплины <span className="mono muted tnum">({entries.length})</span>
           </h2>
           {canEdit && plan.status !== 'ARCHIVED' && (
-            <button
-              onClick={() => setShowAdd((v) => !v)}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
+            <button onClick={() => setShowAdd((v) => !v)} className="btn btn--primary btn--sm">
               {showAdd ? 'Отмена' : 'Добавить'}
             </button>
           )}
@@ -139,37 +140,36 @@ function CurriculumDetail() {
         )}
 
         {semesters.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">Записей пока нет — добавьте дисциплины.</p>
+          <p className="muted" style={{ marginTop: 'var(--s-3)' }}>Записей пока нет — добавьте дисциплины.</p>
         ) : (
           semesters.map((sem) => (
-            <div key={sem} className="mt-4">
-              <h3 className="text-sm font-semibold text-slate-600">Семестр {sem}</h3>
-              <div className="mt-1 overflow-hidden rounded-md ring-1 ring-slate-200">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600">
+            <div key={sem} style={{ marginTop: 'var(--s-4)' }}>
+              <h3 className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)', marginBottom: 'var(--s-2)' }}>
+                Семестр {sem}
+              </h3>
+              <div className="card card--bleed">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-3 py-2 font-medium">Код</th>
-                      <th className="px-3 py-2 font-medium">Дисциплина</th>
-                      <th className="px-3 py-2 font-medium">Форма контроля</th>
-                      <th className="px-3 py-2 text-right font-medium">Часы</th>
-                      {canEdit && <th className="px-3 py-2"></th>}
+                      <th>Код</th>
+                      <th>Дисциплина</th>
+                      <th>Форма контроля</th>
+                      <th style={{ textAlign: 'right' }}>Часы</th>
+                      {canEdit && <th></th>}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody>
                     {bySemester.get(sem)!.map((entry) => {
                       const disc = discMap.get(entry.disciplineId);
                       return (
                         <tr key={entry.id}>
-                          <td className="px-3 py-2 text-slate-500">{disc?.code ?? '—'}</td>
-                          <td className="px-3 py-2">{disc?.name ?? entry.disciplineId}</td>
-                          <td className="px-3 py-2">{CONTROL_FORM_LABELS[entry.controlForm]}</td>
-                          <td className="px-3 py-2 text-right">{entry.hours}</td>
+                          <td className="mono muted">{disc?.code ?? '—'}</td>
+                          <td>{disc?.name ?? entry.disciplineId}</td>
+                          <td>{CONTROL_FORM_LABELS[entry.controlForm]}</td>
+                          <td className="tnum" style={{ textAlign: 'right' }}>{entry.hours}</td>
                           {canEdit && (
-                            <td className="px-3 py-2 text-right">
-                              <button
-                                onClick={() => deleteEntry(entry.id)}
-                                className="text-xs text-rose-700 hover:underline"
-                              >
+                            <td style={{ textAlign: 'right' }}>
+                              <button onClick={() => deleteEntry(entry.id)} className="btn btn--danger btn--sm">
                                 Удалить
                               </button>
                             </td>
@@ -215,50 +215,57 @@ function AddEntryForm({
       });
       onDone();
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(explainError(e).hint);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-3 rounded-md bg-slate-50 p-3 ring-1 ring-slate-200 sm:grid-cols-4">
-      <label className="block text-sm">
-        Дисциплина
-        <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1">
+    <form
+      onSubmit={submit}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 'var(--s-3)',
+        marginTop: 'var(--s-3)',
+        padding: 'var(--s-4)',
+        background: 'var(--ais-sub)',
+        border: '1px solid var(--ais-line)',
+        borderRadius: 'var(--r-md)',
+      }}
+    >
+      <label className="field">
+        <span className="field__label">Дисциплина</span>
+        <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} className="input">
           {disciplines.map((d) => (
             <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
           ))}
         </select>
       </label>
-      <label className="block text-sm">
-        Семестр
-        <select value={semester} onChange={(e) => setSemester(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1">
+      <label className="field">
+        <span className="field__label">Семестр</span>
+        <select value={semester} onChange={(e) => setSemester(e.target.value)} className="input">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
       </label>
-      <label className="block text-sm">
-        Форма контроля
-        <select value={controlForm} onChange={(e) => setControlForm(e.target.value as ControlForm)}
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1">
+      <label className="field">
+        <span className="field__label">Форма контроля</span>
+        <select value={controlForm} onChange={(e) => setControlForm(e.target.value as ControlForm)} className="input">
           {(Object.keys(CONTROL_FORM_LABELS) as ControlForm[]).map((cf) => (
             <option key={cf} value={cf}>{CONTROL_FORM_LABELS[cf]}</option>
           ))}
         </select>
       </label>
-      <label className="block text-sm">
-        Часы
-        <input type="number" value={hours} onChange={(e) => setHours(e.target.value)} required min={1}
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+      <label className="field">
+        <span className="field__label">Часы</span>
+        <input type="number" value={hours} onChange={(e) => setHours(e.target.value)} required min={1} className="input" />
       </label>
-      {err && <div className="sm:col-span-4 rounded bg-red-50 p-2 text-sm text-red-700">{err}</div>}
-      <div className="sm:col-span-4 flex justify-end">
-        <button disabled={busy}
-          className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+      {err && <div className="callout callout--danger" style={{ gridColumn: '1 / -1' }}><span>{err}</span></div>}
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+        <button disabled={busy} className="btn btn--primary">
           {busy ? 'Добавляем…' : 'Добавить'}
         </button>
       </div>

@@ -9,9 +9,11 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   private readonly client: MinioClient;
 
   constructor(cfg: ConfigService) {
+    // ConfigService не приводит env-значения к числу — MinIO-клиент строго проверяет
+    // typeof port === 'number' и падает на строке «9000». Явный Number().
     this.client = new MinioClient({
       endPoint: cfg.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: cfg.get<number>('MINIO_PORT', 9000),
+      port: Number(cfg.get('MINIO_PORT', 9000)),
       useSSL: cfg.get<string>('MINIO_USE_SSL', 'false') === 'true',
       accessKey: cfg.getOrThrow<string>('MINIO_ACCESS_KEY'),
       secretKey: cfg.getOrThrow<string>('MINIO_SECRET_KEY'),

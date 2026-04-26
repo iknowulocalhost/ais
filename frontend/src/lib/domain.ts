@@ -19,14 +19,6 @@ export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
   GRADUATED: 'Выпускник',
 };
 
-export const STUDENT_STATUS_COLORS: Record<StudentStatus, string> = {
-  APPLICANT: 'bg-slate-100 text-slate-700',
-  ENROLLED: 'bg-emerald-100 text-emerald-800',
-  ACADEMIC_LEAVE: 'bg-amber-100 text-amber-800',
-  EXPELLED: 'bg-rose-100 text-rose-800',
-  GRADUATED: 'bg-blue-100 text-blue-800',
-};
-
 export interface Student {
   id: string;
   userId: string | null;
@@ -60,13 +52,6 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   REJECTED: 'Отклонён',
 };
 
-export const DOCUMENT_STATUS_COLORS: Record<DocumentStatus, string> = {
-  PENDING: 'bg-slate-100 text-slate-700',
-  UPLOADED: 'bg-amber-100 text-amber-800',
-  VERIFIED: 'bg-emerald-100 text-emerald-800',
-  REJECTED: 'bg-rose-100 text-rose-800',
-};
-
 export interface StudentDocument {
   id: string;
   studentId: string;
@@ -95,13 +80,6 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   PAID: 'Оплачен',
   CANCELLED: 'Отменён',
   REFUNDED: 'Возврат',
-};
-
-export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  PAID: 'bg-emerald-100 text-emerald-800',
-  CANCELLED: 'bg-slate-200 text-slate-700',
-  REFUNDED: 'bg-blue-100 text-blue-800',
 };
 
 export interface Payment {
@@ -153,12 +131,6 @@ export const CURRICULUM_PLAN_STATUS_LABELS: Record<CurriculumPlanStatus, string>
   ARCHIVED: 'Архив',
 };
 
-export const CURRICULUM_PLAN_STATUS_COLORS: Record<CurriculumPlanStatus, string> = {
-  DRAFT: 'bg-slate-100 text-slate-700',
-  ACTIVE: 'bg-emerald-100 text-emerald-800',
-  ARCHIVED: 'bg-rose-100 text-rose-800',
-};
-
 export const CONTROL_FORM_LABELS: Record<ControlForm, string> = {
   EXAM: 'Экзамен',
   CREDIT: 'Зачёт',
@@ -169,11 +141,6 @@ export const CONTROL_FORM_LABELS: Record<ControlForm, string> = {
 export const GRADE_SHEET_STATUS_LABELS: Record<GradeSheetStatus, string> = {
   OPEN: 'Открыта',
   CLOSED: 'Закрыта',
-};
-
-export const GRADE_SHEET_STATUS_COLORS: Record<GradeSheetStatus, string> = {
-  OPEN: 'bg-amber-100 text-amber-800',
-  CLOSED: 'bg-emerald-100 text-emerald-800',
 };
 
 export const GRADE_VALUE_LABELS: Record<number, string> = {
