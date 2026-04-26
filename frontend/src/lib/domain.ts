@@ -65,44 +65,11 @@ export interface StudentDocument {
   updatedAt: string;
 }
 
-export type PaymentPurpose = 'TUITION' | 'DORM' | 'FINE' | 'OTHER';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'CANCELLED' | 'REFUNDED';
-
-export const PAYMENT_PURPOSE_LABELS: Record<PaymentPurpose, string> = {
-  TUITION: 'Обучение',
-  DORM: 'Общежитие',
-  FINE: 'Штраф',
-  OTHER: 'Иное',
-};
-
-export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  PENDING: 'Ожидает',
-  PAID: 'Оплачен',
-  CANCELLED: 'Отменён',
-  REFUNDED: 'Возврат',
-};
-
-export interface Payment {
-  id: string;
-  studentId: string;
-  purpose: PaymentPurpose;
-  amountKopecks: string; // backend отдаёт bigint как строку
-  currency: string;
-  status: PaymentStatus;
-  dueDate: string;
-  paidAt: string | null;
-  externalRef: string | null;
-  comment: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type ReportKind = 'STUDENTS_ROSTER' | 'PAYMENTS_LEDGER';
+export type ReportKind = 'STUDENTS_ROSTER';
 export type ReportStatus = 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
 
 export const REPORT_KIND_LABELS: Record<ReportKind, string> = {
   STUDENTS_ROSTER: 'Реестр студентов',
-  PAYMENTS_LEDGER: 'Реестр платежей',
 };
 
 export interface ReportExport {
@@ -202,16 +169,6 @@ export interface Grade {
   updatedAt: string;
 }
 
-/** «12345» (копеек) → «123,45 ₽» */
-export function formatKopecks(kop: string | number | bigint): string {
-  const n = typeof kop === 'bigint' ? kop : BigInt(String(kop));
-  const neg = n < 0n;
-  const abs = neg ? -n : n;
-  const rub = abs / 100n;
-  const cop = (abs % 100n).toString().padStart(2, '0');
-  const s = `${rub.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')},${cop} ₽`;
-  return neg ? `−${s}` : s;
-}
 
 export function fmtDate(iso: string | null): string {
   if (!iso) return '—';

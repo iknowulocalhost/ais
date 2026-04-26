@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Protected } from '@/components/protected';
 import { StudentDocuments } from '@/components/student-documents';
-import { StudentPayments } from '@/components/student-payments';
 import { StudentGrades } from '@/components/student-grades';
 import { apiFetch } from '@/lib/api';
 import { explainError } from '@/lib/errors';
@@ -18,11 +17,10 @@ import {
 } from '@/lib/domain';
 import { clsx } from '@/components/clsx';
 
-type Tab = 'docs' | 'pay' | 'grades';
+type Tab = 'docs' | 'grades';
 
 const TABS: { key: Tab; label: string; code: string }[] = [
   { key: 'docs',   label: 'Документы',     code: 'doc' },
-  { key: 'pay',    label: 'Платежи',       code: 'pay' },
   { key: 'grades', label: 'Успеваемость',  code: 'grd' },
 ];
 
@@ -171,7 +169,6 @@ function StudentDetail() {
               transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
             >
               {tab === 'docs'   && <StudentDocuments studentId={student.id} />}
-              {tab === 'pay'    && <StudentPayments  studentId={student.id} />}
               {tab === 'grades' && <StudentGrades    studentId={student.id} />}
             </motion.div>
           </AnimatePresence>

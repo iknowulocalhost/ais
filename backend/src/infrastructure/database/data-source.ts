@@ -5,7 +5,6 @@ import { AuditLogOrmEntity } from './entities/audit-log.orm-entity';
 import { GroupOrmEntity } from './entities/group.orm-entity';
 import { StudentOrmEntity } from './entities/student.orm-entity';
 import { StudentDocumentOrmEntity } from './entities/student-document.orm-entity';
-import { PaymentOrmEntity } from './entities/payment.orm-entity';
 import { ReportExportOrmEntity } from './entities/report-export.orm-entity';
 import { ApplicationOrmEntity } from './entities/application.orm-entity';
 import { DisciplineOrmEntity } from './entities/discipline.orm-entity';
@@ -27,7 +26,6 @@ export const AppDataSource = new DataSource({
     GroupOrmEntity,
     StudentOrmEntity,
     StudentDocumentOrmEntity,
-    PaymentOrmEntity,
     ReportExportOrmEntity,
     ApplicationOrmEntity,
     DisciplineOrmEntity,

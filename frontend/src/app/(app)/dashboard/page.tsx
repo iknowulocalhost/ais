@@ -5,13 +5,10 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { apiFetch, ApiError } from '@/lib/api';
-import { clsx } from '@/components/clsx';
-import type { Role } from '@/lib/types';
-
+import { StudentDashboard } from '@/components/student-dashboard';
+import { isStudentOnly } from '@/lib/role-helpers';
 /**
- * /dashboard — единая «сводка» для всех ролей.
- * Герой сверху: приветствие + KPI-плитки. Ниже двуколонка:
- * слева «требует внимания», справа «ритм дня».
+ * /dashboard — сводка для сотрудников. Студенту рендерится StudentDashboard выше.
  */
 
 interface ListPage<T> { items: T[]; total: number }
@@ -19,17 +16,22 @@ interface ListPage<T> { items: T[]; total: number }
 interface Summary {
   studentsTotal: number | null;
   applicationsNew: number | null;
-  paymentsPending: number | null;
   sheetsOpen: number | null;
   expelled: { id: string; name: string }[];
 }
 
 const EMPTY: Summary = {
-  studentsTotal: null, applicationsNew: null, paymentsPending: null, sheetsOpen: null,
+  studentsTotal: null, applicationsNew: null, sheetsOpen: null,
   expelled: [],
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  if (isStudentOnly(user)) return <StudentDashboard />;
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
   const { user } = useAuth();
   const [summary, setSummary] = useState<Summary>(EMPTY);
   const [loaded, setLoaded] = useState(false);
@@ -49,15 +51,13 @@ export default function DashboardPage() {
         ),
         safe<ListPage<unknown>>(apiFetch('/api/students', { query: { limit: 1 } })),
         safe<ListPage<unknown>>(apiFetch('/api/applications', { query: { status: 'SUBMITTED', limit: 1 } })),
-        safe<ListPage<unknown>>(apiFetch('/api/payments', { query: { status: 'PENDING', limit: 1 } })),
         safe<ListPage<unknown>>(apiFetch('/api/grades/sheets', { query: { status: 'OPEN', limit: 1 } })),
       ];
-      const [expelled, students, applications, payments, sheets] = await Promise.all(calls);
+      const [expelled, students, applications, sheets] = await Promise.all(calls);
 
       setSummary({
         studentsTotal:    pickTotal(students),
         applicationsNew:  pickTotal(applications),
-        paymentsPending:  pickTotal(payments),
         sheetsOpen:       pickTotal(sheets),
         expelled: ((expelled?.items ?? []) as Array<{ id: string; firstName: string; lastName: string }>)
           .slice(0, 4)
@@ -99,14 +99,13 @@ export default function DashboardPage() {
         <dl className="row" style={{ gap: 'var(--s-7)' }}>
           <Stat label="студентов"   value={summary.studentsTotal}   href="/students" />
           <Stat label="заявок"      value={summary.applicationsNew} href="/applications" tone={summary.applicationsNew ? 'accent' : 'default'} />
-          <Stat label="к оплате"    value={summary.paymentsPending} href="/payments" />
           <Stat label="ведомостей"  value={summary.sheetsOpen}      href="/grades" />
         </dl>
       </motion.section>
 
       {/* ──────────── BODY ──────────── */}
-      <div style={{ display: 'grid', gap: 'var(--s-6)', gridTemplateColumns: '1.15fr 0.85fr' }}>
-        {/* LEFT — требует внимания */}
+      <div style={{ display: 'grid', gap: 'var(--s-6)' }}>
+        {/* требует внимания */}
         <section className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <header
             className="row"
@@ -141,27 +140,6 @@ export default function DashboardPage() {
               {!loaded && (<><SkeletonRow /><SkeletonRow /><SkeletonRow /></>)}
             </ul>
           )}
-        </section>
-
-        {/* RIGHT — ритм дня */}
-        <section className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <header
-            className="row"
-            style={{
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: 'var(--s-4) var(--s-5)',
-              borderBottom: '1px solid var(--ais-line)',
-            }}
-          >
-            <span className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-              ритм дня
-            </span>
-            <span className="mono tnum muted" style={{ fontSize: 11 }}>{fmtClock(now)}</span>
-          </header>
-          <div style={{ padding: 'var(--s-5)' }}>
-            <RhythmTimeline now={now} roles={user?.roles ?? []} />
-          </div>
         </section>
       </div>
     </div>
@@ -249,49 +227,6 @@ function EmptyAttention() {
   );
 }
 
-function RhythmTimeline({ now, roles }: { now: Date; roles: Role[] }) {
-  const hour = now.getHours();
-  const beats = useMemo(() => buildBeats(roles, hour), [roles, hour]);
-  return (
-    <ol style={{ position: 'relative', listStyle: 'none', margin: 0, padding: '0 0 0 var(--s-5)' }}>
-      <span
-        style={{
-          pointerEvents: 'none',
-          position: 'absolute',
-          left: 6,
-          top: 6,
-          bottom: 6,
-          width: 1,
-          background: 'var(--ais-line)',
-        }}
-      />
-      {beats.map((b, i) => (
-        <li key={i} style={{ position: 'relative', padding: 'var(--s-1) 0' }}>
-          <span
-            style={{
-              position: 'absolute',
-              left: -18,
-              top: 10,
-              height: 8,
-              width: 8,
-              borderRadius: '50%',
-              background: b.passed ? 'var(--ais-forest)' : 'var(--ais-line-strong)',
-            }}
-          />
-          <div className="row" style={{ alignItems: 'baseline', gap: 'var(--s-3)' }}>
-            <span className="mono tnum" style={{ width: 48, fontSize: 11, color: 'var(--ais-bone-4)' }}>
-              {b.time}
-            </span>
-            <span className={clsx(b.passed ? undefined : 'muted')} style={{ fontSize: 'var(--fs-13)', color: b.passed ? 'var(--ais-bone)' : undefined }}>
-              {b.label}
-            </span>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /* ───────────────── pure helpers ───────────────── */
 
 async function safe<T>(p: Promise<T>): Promise<T | null> {
@@ -328,28 +263,3 @@ function formatDate(d: Date): string {
   return `${days[d.getDay()]} · ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function fmtClock(d: Date): string {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function buildBeats(roles: Role[], hour: number): { time: string; label: string; passed: boolean }[] {
-  const isTea = roles.includes('TEA');
-  const isCom = roles.includes('COM');
-  const isAcc = roles.includes('ACC');
-  const isAdm = roles.includes('ADM') || roles.includes('SUPERADMIN');
-
-  const b: { at: number; label: string }[] = [
-    { at: 9,  label: 'начало рабочего дня' },
-  ];
-  if (isCom) b.push({ at: 10, label: 'приём новых заявок' });
-  if (isTea) b.push({ at: 11, label: 'проверка ведомостей' });
-  if (isAcc) b.push({ at: 12, label: 'сверка платежей за вчера' });
-  if (isAdm) b.push({ at: 14, label: 'экспорт еженедельного отчёта' });
-  b.push({ at: 18, label: 'окончание смены' });
-
-  return b.map((x) => ({
-    time: `${String(x.at).padStart(2, '0')}:00`,
-    label: x.label,
-    passed: hour >= x.at,
-  }));
-}

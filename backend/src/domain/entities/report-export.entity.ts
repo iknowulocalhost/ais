@@ -1,4 +1,4 @@
-export type ReportKind = 'STUDENTS_ROSTER' | 'PAYMENTS_LEDGER';
+export type ReportKind = 'STUDENTS_ROSTER';
 export type ReportStatus = 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
 
 export class ReportExport {

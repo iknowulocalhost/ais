@@ -19,7 +19,7 @@ export class AuditLog {
     public readonly ts: Date,
     public readonly actorId: string | null, // null — анонимная попытка (напр. LOGIN_FAILED)
     public readonly action: AuditAction,
-    public readonly entity: string,         // например 'User', 'Student', 'Payment'
+    public readonly entity: string,         // например 'User', 'Student', 'Application'
     public readonly entityId: string | null,
     public readonly ipAddress: string | null,
     public readonly userAgent: string | null,

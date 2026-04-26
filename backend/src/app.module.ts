@@ -11,11 +11,11 @@ import { UsersModule } from './presentation/http/users.module';
 import { AuthModule } from './presentation/http/auth.module';
 import { StudentsModule } from './presentation/http/students.module';
 import { DocumentsModule } from './presentation/http/documents.module';
-import { PaymentsModule } from './presentation/http/payments.module';
 import { ReportsModule } from './presentation/http/reports.module';
 import { ApplicationsModule } from './presentation/http/applications.module';
 import { CurriculumModule } from './presentation/http/curriculum.module';
 import { GradesModule } from './presentation/http/grades.module';
+import { AdmissionsModule } from './presentation/http/admissions.module';
 import { ContextModule } from './infrastructure/context/context.module';
 import { NotificationsModule } from './infrastructure/notifications/notifications.module';
 import { BootstrapModule } from './infrastructure/bootstrap/bootstrap.module';
@@ -38,11 +38,11 @@ import { RolesGuard } from './presentation/http/auth/roles.guard';
     UsersModule,
     StudentsModule,
     DocumentsModule,
-    PaymentsModule,
     ReportsModule,
     ApplicationsModule,
     CurriculumModule,
     GradesModule,
+    AdmissionsModule,
     BootstrapModule,
   ],
   controllers: [HealthController],

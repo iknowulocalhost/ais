@@ -27,7 +27,7 @@ import {
 import { ReportKind } from '../../../domain/entities/report-export.entity';
 
 class RequestExportDto {
-  @IsEnum(['STUDENTS_ROSTER', 'PAYMENTS_LEDGER'])
+  @IsEnum(['STUDENTS_ROSTER'])
   kind!: ReportKind;
 
   @IsOptional() @IsObject()

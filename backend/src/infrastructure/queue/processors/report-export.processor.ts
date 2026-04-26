@@ -12,10 +12,6 @@ import {
   StudentRepository,
 } from '../../../domain/repositories/student.repository';
 import {
-  PAYMENT_REPOSITORY,
-  PaymentRepository,
-} from '../../../domain/repositories/payment.repository';
-import {
   OBJECT_STORAGE,
   ObjectStorage,
   BUCKETS,
@@ -35,7 +31,6 @@ export class ReportExportProcessor extends WorkerHost {
   constructor(
     @Inject(REPORT_EXPORT_REPOSITORY) private readonly reports: ReportExportRepository,
     @Inject(STUDENT_REPOSITORY)       private readonly students: StudentRepository,
-    @Inject(PAYMENT_REPOSITORY)       private readonly payments: PaymentRepository,
     @Inject(OBJECT_STORAGE)           private readonly storage: ObjectStorage,
   ) {
     super();
@@ -57,8 +52,6 @@ export class ReportExportProcessor extends WorkerHost {
       const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ stream });
       if (report.kind === 'STUDENTS_ROSTER') {
         await this.buildStudentsRoster(wb);
-      } else if (report.kind === 'PAYMENTS_LEDGER') {
-        await this.buildPaymentsLedger(wb);
       }
       await wb.commit();
       stream.push(null);
@@ -110,35 +103,4 @@ export class ReportExportProcessor extends WorkerHost {
     ws.commit();
   }
 
-  private async buildPaymentsLedger(wb: ExcelJS.stream.xlsx.WorkbookWriter): Promise<void> {
-    const ws = wb.addWorksheet('Payments');
-    ws.columns = [
-      { header: 'ID', key: 'id', width: 38 },
-      { header: 'Студент', key: 'studentId', width: 38 },
-      { header: 'Назначение', key: 'purpose', width: 14 },
-      { header: 'Сумма, ₽', key: 'amount', width: 12 },
-      { header: 'Статус', key: 'status', width: 12 },
-      { header: 'Срок', key: 'dueDate', width: 14 },
-      { header: 'Оплачено', key: 'paidAt', width: 20 },
-    ];
-    let offset = 0;
-    for (;;) {
-      const { items } = await this.payments.list({}, PAGE, offset);
-      if (items.length === 0) break;
-      for (const p of items) {
-        ws.addRow({
-          id: p.id,
-          studentId: p.studentId,
-          purpose: p.purpose,
-          amount: Number(p.amountKopecks) / 100,
-          status: p.status,
-          dueDate: p.dueDate,
-          paidAt: p.paidAt,
-        }).commit();
-      }
-      if (items.length < PAGE) break;
-      offset += PAGE;
-    }
-    ws.commit();
-  }
 }

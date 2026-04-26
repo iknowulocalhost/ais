@@ -8,7 +8,16 @@
       "Bash(npm install *)",
       "Bash(npx next *)",
       "Bash(python -c ' *)",
-      "PowerShell(cd C:\\\\Users\\\\filatkinaa\\\\ais\\\\backend; if \\(!\\(Test-Path node_modules\\)\\) { npm install 2>&1 | Select-Object -Last 5 }; npx tsc --noEmit 2>&1 | Select-Object -First 40)"
+      "PowerShell(cd C:\\\\Users\\\\filatkinaa\\\\ais\\\\backend; if \\(!\\(Test-Path node_modules\\)\\) { npm install 2>&1 | Select-Object -Last 5 }; npx tsc --noEmit 2>&1 | Select-Object -First 40)",
+      "Bash(docker compose *)",
+      "Bash(awk 'NR>=464 && NR<=466' frontend/src/components/student-dashboard.tsx)",
+      "Bash(awk 'NR<463 || NR>467' frontend/src/components/student-dashboard.tsx)",
+      "Bash(mv /tmp/sd.tsx frontend/src/components/student-dashboard.tsx)",
+      "Bash(sed -n '459,468p' frontend/src/components/student-dashboard.tsx)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(find . -path ./node_modules -prune -o -path ./*/node_modules -prune -o -path ./.git -prune -o -type f \\\\\\( -iname '*payment*' -o -iname '*Payment*' \\\\\\) -print)",
+      "Bash(awk 'NR<172 || NR>181' frontend/src/lib/domain.ts)",
+      "Bash(mv /tmp/d.ts frontend/src/lib/domain.ts)"
     ]
   }
 }
