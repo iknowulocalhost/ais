@@ -1,0 +1,213 @@
+/* ============================================
+   АИС:Студент — Design Tokens
+   Вариант A (основной): тёплая тёмная бумажная палитра
+   ============================================ */
+
+:root {
+  /* — Surfaces & Ink — */
+  --ais-ink:      #0E0E0C;   /* deepest background */
+  --ais-paper:    #161513;   /* raised surface / cards */
+  --ais-paper-2:  #1E1C18;   /* higher elevation / input fill */
+  --ais-line:     #2A2721;   /* hairlines, borders */
+  --ais-line-2:   #3A362E;   /* stronger borders */
+  --ais-veil:     rgba(14,14,12,0.72); /* overlay */
+
+  /* — Bone / text — */
+  --ais-bone:     #F4EFE5;   /* primary text */
+  --ais-bone-2:   #C9C2B3;   /* secondary text */
+  --ais-bone-3:   #8C8779;   /* muted / captions */
+  --ais-bone-4:   #5C5951;   /* disabled */
+
+  /* — Brand — */
+  --ais-forest:   #8FB388;   /* primary, ok, pass */
+  --ais-forest-d: #3E5E3C;   /* hover darken */
+  --ais-ivy:      #1F3A2E;   /* deep section bg */
+  --ais-ivy-2:    #14261E;
+
+  /* — Accents — */
+  --ais-ember:    #E8553A;   /* critical, fail, primary cta (variant B) */
+  --ais-ember-d:  #B93A24;
+  --ais-ochre:    #E8A33D;   /* warning, achievements */
+  --ais-ochre-d:  #B67820;
+  --ais-bloom:    #D46A8A;   /* tertiary (rare, tag) */
+
+  /* — Semantic — */
+  --ais-ok:       var(--ais-forest);
+  --ais-warn:     var(--ais-ochre);
+  --ais-bad:      var(--ais-ember);
+  --ais-info:     #6AA9D4;
+
+  /* — Grade colors (distinct, not just red/green) — */
+  --grade-5:      #8FB388;   /* отлично */
+  --grade-4:      #B8C97E;   /* хорошо */
+  --grade-3:      #E8A33D;   /* удовл */
+  --grade-2:      #E8553A;   /* неуд */
+  --grade-n:      #8C8779;   /* нет оценки / н/а */
+
+  /* — Type scale — */
+  --ais-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ais-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ais-font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-22: 22px;
+  --fs-28: 28px;
+  --fs-36: 36px;
+  --fs-48: 48px;
+  --fs-64: 64px;
+  --fs-96: 96px;
+
+  --lh-tight: 1.05;
+  --lh-snug:  1.25;
+  --lh-body:  1.5;
+  --lh-loose: 1.7;
+
+  /* — Radii — */
+  --r-2:  2px;
+  --r-4:  4px;
+  --r-6:  6px;
+  --r-8:  8px;
+  --r-10: 10px;
+  --r-14: 14px;
+  --r-20: 20px;
+  --r-pill: 999px;
+
+  /* — Spacing (4px base) — */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  40px;
+  --s-9:  56px;
+  --s-10: 72px;
+  --s-11: 96px;
+
+  /* — Shadows (very subtle on dark) — */
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-2: 0 2px 0 rgba(0,0,0,0.5), 0 6px 16px rgba(0,0,0,0.35);
+  --shadow-3: 0 4px 0 rgba(0,0,0,0.5), 0 20px 48px rgba(0,0,0,0.5);
+  --shadow-pop: 0 18px 50px rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.5);
+  --glow-forest: 0 0 0 1px rgba(143,179,136,0.4), 0 8px 24px rgba(143,179,136,0.15);
+  --glow-ember:  0 0 0 1px rgba(232,85,58,0.45), 0 8px 24px rgba(232,85,58,0.18);
+
+  /* — Motion — */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 360ms;
+}
+
+/* — Variant B: higher contrast, ember-primary — */
+[data-variant="b"] {
+  --ais-ink:      #100F0D;
+  --ais-paper:    #1A1816;
+  --ais-paper-2:  #22201C;
+  --ais-line:     #302C25;
+  --ais-line-2:   #4A4439;
+  --ais-bone:     #FFFAF0;
+  --ais-forest:   #C8E3A8;
+  --ais-ember:    #FF5C3D;
+  --ais-ochre:    #FFB547;
+}
+
+/* ============================================
+   LIGHT THEME — academic paper / daylight
+   ============================================ */
+[data-theme="light"] {
+  /* Surfaces invert: paper becomes actual paper */
+  --ais-ink:      #F4EFE5;   /* main bg — warm cream */
+  --ais-paper:    #FAF6EC;   /* cards, slightly brighter */
+  --ais-paper-2: #EEE7D7;   /* input fill */
+  --ais-line:    #DDD3BE;   /* hairlines */
+  --ais-line-2:  #C5BAA1;   /* stronger borders */
+  --ais-veil:    rgba(244,239,229,0.72);
+
+  /* Ink/bone invert: dark text on paper */
+  --ais-bone:    #14130F;   /* main text */
+  --ais-bone-2:  #3B3830;   /* secondary */
+  --ais-bone-3:  #6B6656;   /* muted */
+  --ais-bone-4:  #9B9581;   /* disabled */
+
+  /* Brand: deeper green works better on light */
+  --ais-forest:  #3E6B3A;
+  --ais-forest-d:#2B4D28;
+  --ais-ivy:     #1F3A2E;
+  --ais-ivy-2:   #F0EBE0;   /* used as "on-forest" text — now light */
+
+  --ais-ember:   #C8401F;
+  --ais-ember-d: #9A3118;
+  --ais-ochre:   #B67820;
+  --ais-ochre-d: #8A5810;
+  --ais-bloom:   #A84466;
+
+  --ais-info:    #2F6FA0;
+
+  /* Grade colors — readable on cream */
+  --grade-5: #3E6B3A;
+  --grade-4: #6B8A3A;
+  --grade-3: #B67820;
+  --grade-2: #C8401F;
+  --grade-n: #9B9581;
+
+  /* Softer shadows on light */
+  --shadow-1: 0 1px 0 rgba(20,19,15,0.04), 0 1px 2px rgba(20,19,15,0.06);
+  --shadow-2: 0 2px 0 rgba(20,19,15,0.04), 0 6px 16px rgba(20,19,15,0.08);
+  --shadow-3: 0 4px 0 rgba(20,19,15,0.04), 0 20px 48px rgba(20,19,15,0.12);
+  --shadow-pop: 0 18px 50px rgba(20,19,15,0.18), 0 2px 0 rgba(20,19,15,0.06);
+  --glow-forest: 0 0 0 1px rgba(62,107,58,0.25), 0 8px 24px rgba(62,107,58,0.1);
+}
+
+/* Light theme adjustments for components that used dark-only tricks */
+[data-theme="light"] .tip { background: var(--ais-bone); color: var(--ais-ink); }
+[data-theme="light"] .tip::after { background: var(--ais-bone); }
+[data-theme="light"] .badge--solid-forest { color: #FAF6EC; }
+[data-theme="light"] .grade--5 { color: #FAF6EC; }
+[data-theme="light"] .grade--2 { color: #FAF6EC; }
+[data-theme="light"] .btn--primary { color: #FAF6EC; }
+[data-theme="light"] .btn--primary:hover { background: var(--ais-forest-d); border-color: var(--ais-forest-d); }
+[data-theme="light"] .check input:checked + .switch::after { background: #FAF6EC; }
+[data-theme="light"] .check input:checked + .check__box svg { stroke: #FAF6EC; }
+[data-theme="light"] ::selection { background: var(--ais-forest); color: #FAF6EC; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--ais-line-2); border-color: var(--ais-ink); }
+
+/* ============ Global reset ============ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--ais-ink);
+  color: var(--ais-bone);
+  font-family: var(--ais-font-sans);
+  font-size: var(--fs-15);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'cv11', 'tnum';
+}
+button { font-family: inherit; }
+a { color: inherit; }
+::selection { background: var(--ais-forest); color: var(--ais-ink); }
+
+/* ============ Paper grain bg ============ */
+.paper-grain {
+  background-image:
+    radial-gradient(rgba(244,239,229,0.02) 1px, transparent 1px),
+    radial-gradient(rgba(244,239,229,0.015) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 1px;
+}
+
+/* ============ Scrollbar ============ */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ais-ink); }
+::-webkit-scrollbar-thumb { background: var(--ais-line-2); border-radius: var(--r-pill); border: 2px solid var(--ais-ink); }
+::-webkit-scrollbar-thumb:hover { background: var(--ais-bone-4); }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Protected } from '@/components/protected';
 import { apiFetch } from '@/lib/api';
+import { explainError } from '@/lib/errors';
 import type { AuthUser } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -27,35 +28,40 @@ function UsersList() {
     let cancelled = false;
     apiFetch<UsersPage>('/api/users', { query: { limit: 50 } })
       .then((d) => { if (!cancelled) setData(d); })
-      .catch((e: Error) => { if (!cancelled) setError(e.message); });
+      .catch((e: unknown) => { if (!cancelled) setError(explainError(e).hint); });
     return () => { cancelled = true; };
   }, []);
 
-  if (error) return <div className="rounded bg-red-50 p-4 text-sm text-red-700">{error}</div>;
-  if (!data) return <div className="text-slate-500">Загрузка…</div>;
+  if (error) return <div className="callout callout--danger"><span>{error}</span></div>;
+  if (!data) return <div className="muted">Загрузка…</div>;
 
   return (
-    <div>
-      <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Пользователи</h1>
-        <span className="text-sm text-slate-500">всего: {data.total}</span>
-      </div>
-      <div className="overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      <header className="row" style={{ justifyContent: 'space-between' }}>
+        <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Пользователи</h1>
+        <span className="mono muted">всего: <span className="tnum">{data.total}</span></span>
+      </header>
+
+      <div className="card card--bleed">
+        <table className="table">
+          <thead>
             <tr>
-              <th className="px-4 py-2 font-medium">ФИО</th>
-              <th className="px-4 py-2 font-medium">Email</th>
-              <th className="px-4 py-2 font-medium">Роли</th>
+              <th>ФИО</th>
+              <th>Email</th>
+              <th>Роли</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {data.items.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2">{u.lastName} {u.firstName}</td>
-                <td className="px-4 py-2 text-slate-700">{u.email}</td>
-                <td className="px-4 py-2 text-slate-700">
-                  {u.roles.map((r) => ROLE_LABELS[r]).join(', ')}
+              <tr key={u.id}>
+                <td>{u.lastName} {u.firstName}</td>
+                <td className="muted">{u.email}</td>
+                <td>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 'var(--s-1)' }}>
+                    {u.roles.map((r) => (
+                      <span key={r} className="badge">{ROLE_LABELS[r]}</span>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ))}

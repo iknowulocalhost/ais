@@ -1,4 +1,5 @@
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const STATUSES = ['APPLICANT', 'ENROLLED', 'ACADEMIC_LEAVE', 'EXPELLED', 'GRADUATED'] as const;
 type StudentStatusLiteral = (typeof STATUSES)[number];
@@ -35,4 +36,10 @@ export class ListStudentsQueryDto {
 
   @IsOptional() @IsString()
   search?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
 }

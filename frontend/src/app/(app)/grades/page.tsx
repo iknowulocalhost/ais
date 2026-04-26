@@ -4,16 +4,21 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Protected } from '@/components/protected';
 import { apiFetch } from '@/lib/api';
+import { explainError } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   fmtDate,
-  GRADE_SHEET_STATUS_COLORS,
   GRADE_SHEET_STATUS_LABELS,
   type GradeSheet,
   type GradeSheetStatus,
 } from '@/lib/domain';
 
 interface Page { items: GradeSheet[]; total: number }
+
+const SHEET_STATUS_VARIANT: Record<GradeSheetStatus, string> = {
+  OPEN: 'badge--warn',
+  CLOSED: 'badge--ok',
+};
 
 export default function GradeSheetsPage() {
   return (
@@ -37,31 +42,31 @@ function GradeSheetsList() {
       const d = await apiFetch<Page>('/api/grades/sheets', {
         query: {
           status: status || undefined,
-          // TEA видит только свои ведомости (если не ADM/ANA)
           teacherId: hasRole(['ADM', 'ANA']) ? undefined : user?.id,
           limit: 100,
         },
       });
       setData(d);
     } catch (e) {
-      setError((e as Error).message);
+      setError(explainError(e).hint);
     }
   }, [status, hasRole, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Ведомости</h1>
-          {data && <p className="text-sm text-slate-500">Всего: {data.total}</p>}
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      <header className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="col" style={{ gap: 'var(--s-1)' }}>
+          <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Ведомости</h1>
+          {data && <p className="mono muted" style={{ fontSize: 'var(--fs-13)' }}>Всего: <span className="tnum">{data.total}</span></p>}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="row" style={{ gap: 'var(--s-3)', alignItems: 'center' }}>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as GradeSheetStatus | '')}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="input"
+            style={{ width: 'auto' }}
           >
             <option value="">Все</option>
             {(Object.keys(GRADE_SHEET_STATUS_LABELS) as GradeSheetStatus[]).map((s) => (
@@ -71,48 +76,52 @@ function GradeSheetsList() {
           {canCreate && (
             <button
               onClick={() => setShowForm((v) => !v)}
-              className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700"
+              className="btn btn--primary btn--sm"
             >
               {showForm ? 'Отмена' : 'Создать ведомость'}
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {error && <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="callout callout--danger"><span>{error}</span></div>}
 
       {showForm && <CreateSheetForm onDone={() => { setShowForm(false); void load(); }} />}
 
       {!data ? (
-        <div className="text-slate-500">Загрузка…</div>
+        <div className="muted">Загрузка…</div>
       ) : (
-        <div className="overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
+        <div className="card card--bleed">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="px-4 py-2 font-medium">ID</th>
-                <th className="px-4 py-2 font-medium">Дата</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
+                <th>ID</th>
+                <th>Дата</th>
+                <th>Статус</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {data.items.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2">
-                    <Link href={`/grades/${s.id}`} className="text-blue-700 hover:underline">
+                <tr key={s.id}>
+                  <td>
+                    <Link href={`/grades/${s.id}`} className="mono" style={{ color: 'var(--ais-forest-hi)' }}>
                       {s.id.slice(0, 8)}…
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-slate-700">{fmtDate(s.date)}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${GRADE_SHEET_STATUS_COLORS[s.status]}`}>
+                  <td className="mono muted">{fmtDate(s.date)}</td>
+                  <td>
+                    <span className={`badge ${SHEET_STATUS_VARIANT[s.status]}`}>
                       {GRADE_SHEET_STATUS_LABELS[s.status]}
                     </span>
                   </td>
                 </tr>
               ))}
               {data.items.length === 0 && (
-                <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-500">Нет ведомостей</td></tr>
+                <tr>
+                  <td colSpan={3} className="muted" style={{ textAlign: 'center', padding: 'var(--s-6)' }}>
+                    Нет ведомостей
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -140,35 +149,32 @@ function CreateSheetForm({ onDone }: { onDone: () => void }) {
       });
       onDone();
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(explainError(e).hint);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="rounded-md bg-slate-50 p-4 ring-1 ring-slate-200 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <label className="block text-sm">
-        ID группы
+    <form onSubmit={submit} className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--s-3)' }}>
+      <label className="field">
+        <span className="field__label">ID группы</span>
         <input value={groupId} onChange={(e) => setGroupId(e.target.value)} required
-          placeholder="UUID группы"
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          placeholder="UUID группы" className="input" />
       </label>
-      <label className="block text-sm">
-        ID записи учебного плана
+      <label className="field">
+        <span className="field__label">ID записи учебного плана</span>
         <input value={curriculumEntryId} onChange={(e) => setCurriculumEntryId(e.target.value)} required
-          placeholder="UUID curriculum_entry"
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          placeholder="UUID curriculum_entry" className="input" />
       </label>
-      <label className="block text-sm">
-        Дата проведения
+      <label className="field">
+        <span className="field__label">Дата проведения</span>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-          className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1" />
+          className="input" />
       </label>
-      {err && <div className="sm:col-span-3 rounded bg-red-50 p-2 text-sm text-red-700">{err}</div>}
-      <div className="sm:col-span-3 flex justify-end">
-        <button disabled={busy}
-          className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+      {err && <div className="callout callout--danger" style={{ gridColumn: '1 / -1' }}><span>{err}</span></div>}
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+        <button disabled={busy} className="btn btn--primary">
           {busy ? 'Создаём…' : 'Создать'}
         </button>
       </div>

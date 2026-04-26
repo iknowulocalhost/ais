@@ -1,4 +1,5 @@
-import { IsDateString, IsEnum, IsOptional, IsString, Matches, IsUUID } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, IsUUID, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const PURPOSES = ['TUITION', 'DORM', 'FINE', 'OTHER'] as const;
 const STATUSES = ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED'] as const;
@@ -17,6 +18,8 @@ export class ListPaymentsQueryDto {
   @IsOptional() @IsEnum(STATUSES) status?: (typeof STATUSES)[number];
   @IsOptional() @IsDateString() from?: string;
   @IsOptional() @IsDateString() to?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
 }
 
 export class MarkPaidDto {
