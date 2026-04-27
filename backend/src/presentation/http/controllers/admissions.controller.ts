@@ -35,7 +35,7 @@ export class AdmissionsController {
     @Inject(APPLICANT_REPOSITORY) private readonly repo: ApplicantRepository,
   ) {}
 
-  @Roles(Role.ADM, Role.COM)
+  @Roles(Role.COM)
   @Post()
   async create(@Body() dto: CreateApplicantDto, @CurrentUser() user: AuthenticatedUser | null) {
     if (!user) throw new ForbiddenException();
@@ -47,7 +47,7 @@ export class AdmissionsController {
     return { id: saved.id, status: saved.status, createdAt: saved.createdAt };
   }
 
-  @Roles(Role.ADM, Role.COM)
+  @Roles(Role.COM)
   @Get()
   async list(@Query() q: ListApplicantsQueryDto) {
     const res = await this.repo.list(
@@ -61,7 +61,7 @@ export class AdmissionsController {
     };
   }
 
-  @Roles(Role.ADM, Role.COM)
+  @Roles(Role.COM)
   @Get(':id')
   async getOne(@Param('id', ParseUUIDPipe) id: string) {
     const a = await this.repo.findById(id);

@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   Save,
   FileCheck,
+  FolderOpen,
   Camera,
   User,
   BookUser,
@@ -201,7 +203,7 @@ export default function AdmissionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!hasRole(['ADM', 'COM'])) {
+  if (!hasRole(['SUPERADMIN', 'COM'])) {
     return (
       <div className="col" style={{ maxWidth: 560, margin: '0 auto', padding: 'var(--s-7)', gap: 'var(--s-3)', textAlign: 'center' }}>
         <h1 className="display" style={{ fontSize: 'var(--fs-22)' }}>Недостаточно прав</h1>
@@ -326,7 +328,7 @@ export default function AdmissionsPage() {
             Карточка абитуриента
           </h1>
           <p className="muted" style={{ margin: 0, fontSize: 'var(--fs-14)', maxWidth: 620 }}>
-            Внесите данные нового абитуриента. Черновик сохраняется локально, отправка передаст карточку приёмной комиссии в зашифрованном виде.
+            Внесите данные нового абитуриента. Внимательно отнеситесь к вводу данных, изменение возможно только через администратора.
           </p>
 
           <div className="row" style={{ gap: 'var(--s-3)', marginTop: 'var(--s-3)' }}>
@@ -354,6 +356,11 @@ export default function AdmissionsPage() {
             <span className="badge badge--ok"><CheckCircle2 size={12} strokeWidth={2} />карточка отправлена</span>
           )}
           <div className="row" style={{ gap: 'var(--s-2)' }}>
+            {hasRole(['SUPERADMIN', 'COM']) && (
+              <Link href="/admissions/list" className="btn btn--ghost">
+                <FolderOpen size={14} strokeWidth={1.75} /> Реестр
+              </Link>
+            )}
             <button type="button" onClick={saveDraft} className="btn btn--outline" disabled={submitting}>
               <Save size={14} strokeWidth={1.75} /> Черновик
             </button>
@@ -942,43 +949,43 @@ function serializeForApi(d: Draft): Record<string, unknown> {
 
     education: d.education.length
       ? d.education.map((e) => ({
-          institution: e.institution || undefined,
-          graduationYear: intn(e.graduationYear),
-          averageGrade: num(e.averageGrade),
-          documentType: e.documentType || undefined,
-          documentSeries: e.documentSeries || undefined,
-          documentNumber: e.documentNumber || undefined,
-          documentIssueDate: e.documentIssueDate || undefined,
-          institutionType: e.institutionType || undefined,
-        }))
+        institution: e.institution || undefined,
+        graduationYear: intn(e.graduationYear),
+        averageGrade: num(e.averageGrade),
+        documentType: e.documentType || undefined,
+        documentSeries: e.documentSeries || undefined,
+        documentNumber: e.documentNumber || undefined,
+        documentIssueDate: e.documentIssueDate || undefined,
+        institutionType: e.institutionType || undefined,
+      }))
       : undefined,
 
     questionnaire: qFilled
       ? {
-          medal: d.questionnaire.medal || undefined,
-          olympicChampion: d.questionnaire.olympicChampion || undefined,
-          workYears: intn(d.questionnaire.workYears),
-          workMonths: intn(d.questionnaire.workMonths),
-          specialtyYears: intn(d.questionnaire.specialtyYears),
-          specialtyMonths: intn(d.questionnaire.specialtyMonths),
-          foreignLanguages: d.questionnaire.foreignLanguages || undefined,
-          spoLevel: d.questionnaire.spoLevel || undefined,
-        }
+        medal: d.questionnaire.medal || undefined,
+        olympicChampion: d.questionnaire.olympicChampion || undefined,
+        workYears: intn(d.questionnaire.workYears),
+        workMonths: intn(d.questionnaire.workMonths),
+        specialtyYears: intn(d.questionnaire.specialtyYears),
+        specialtyMonths: intn(d.questionnaire.specialtyMonths),
+        foreignLanguages: d.questionnaire.foreignLanguages || undefined,
+        spoLevel: d.questionnaire.spoLevel || undefined,
+      }
       : undefined,
 
     additional: aFilled
       ? {
-          receiptNumber: d.additional.receiptNumber || undefined,
-          paidAmount: num(d.additional.paidAmount),
-          paidMonths: intn(d.additional.paidMonths),
-          bank: d.additional.bank || undefined,
-          accountNumber: d.additional.accountNumber || undefined,
-          needsDormitory: d.additional.needsDormitory,
-          educationForm: d.additional.educationForm || undefined,
-          benefits: d.additional.benefits || undefined,
-          specialty: d.additional.specialty || undefined,
-          note: d.additional.note || undefined,
-        }
+        receiptNumber: d.additional.receiptNumber || undefined,
+        paidAmount: num(d.additional.paidAmount),
+        paidMonths: intn(d.additional.paidMonths),
+        bank: d.additional.bank || undefined,
+        accountNumber: d.additional.accountNumber || undefined,
+        needsDormitory: d.additional.needsDormitory,
+        educationForm: d.additional.educationForm || undefined,
+        benefits: d.additional.benefits || undefined,
+        specialty: d.additional.specialty || undefined,
+        note: d.additional.note || undefined,
+      }
       : undefined,
 
     military: mFilled ? d.military : undefined,

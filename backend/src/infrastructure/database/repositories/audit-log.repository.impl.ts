@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from '../../../domain/entities/audit-log.entity';
-import { AuditLogRepository } from '../../../domain/repositories/audit-log.repository';
+import {
+  AuditFilter,
+  AuditLogRepository,
+} from '../../../domain/repositories/audit-log.repository';
 import { AuditLogOrmEntity } from '../entities/audit-log.orm-entity';
 import { randomUUID } from 'crypto';
 
@@ -47,6 +50,30 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
       take: limit,
     });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async find(
+    filter: AuditFilter,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: AuditLog[]; total: number }> {
+    const qb = this.repo.createQueryBuilder('a').orderBy('a.ts', 'DESC');
+
+    if (filter.from) qb.andWhere('a.ts >= :from', { from: filter.from });
+    if (filter.to) qb.andWhere('a.ts <= :to', { to: filter.to });
+    if (filter.actorId) qb.andWhere('a.actor_id = :actorId', { actorId: filter.actorId });
+    if (filter.action) qb.andWhere('a.action = :action', { action: filter.action });
+    if (filter.entity) qb.andWhere('a.entity = :entity', { entity: filter.entity });
+    if (filter.entityId) qb.andWhere('a.entity_id = :entityId', { entityId: filter.entityId });
+    if (filter.search) {
+      qb.andWhere(
+        '(a.entity ILIKE :s OR a.action ILIKE :s OR a.entity_id ILIKE :s OR CAST(a.meta AS text) ILIKE :s)',
+        { s: `%${filter.search}%` },
+      );
+    }
+
+    const [rows, total] = await qb.take(limit).skip(offset).getManyAndCount();
+    return { items: rows.map((r) => this.toDomain(r)), total };
   }
 
   private toDomain(r: AuditLogOrmEntity): AuditLog {

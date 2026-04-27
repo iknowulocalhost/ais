@@ -12,7 +12,9 @@ export type AuditAction =
   | 'LOGIN_FAILED'
   | 'PASSWORD_CHANGE'
   | 'ROLE_CHANGE'
-  | 'READ_SENSITIVE';
+  | 'READ_SENSITIVE'
+  | 'HTTP_REQUEST'
+  | 'SECURITY_ALERT';
 
 export class AuditLog {
   constructor(

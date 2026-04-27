@@ -60,15 +60,6 @@ export default function LoginPage() {
             transition={{ duration: 0.42, ease: [0.2, 0.7, 0.2, 1] }}
             className="max-w-[560px]"
           >
-            <div className="row" style={{ gap: 'var(--s-3)' }}>
-              <span
-                aria-hidden
-                className="sidebar__brand"
-                style={{ padding: 0 }}
-              >
-                <span className="mark">А</span>
-              </span>
-            </div>
 
             <h1 className="display" style={{ marginTop: 'var(--s-5)', fontSize: 'clamp(44px, 5.6vw, 68px)' }}>
               АИС Студенты

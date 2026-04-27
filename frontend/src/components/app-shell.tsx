@@ -8,11 +8,14 @@ import {
   Users,
   Inbox,
   GraduationCap,
-  BookOpen,
   ClipboardCheck,
   BarChart3,
   UserCircle,
   UserPlus,
+  ScrollText,
+  FileText,
+  ShieldAlert,
+  UsersRound,
   Search,
   Settings,
   Menu,
@@ -24,41 +27,50 @@ import { ROLE_LABELS, type Role } from '@/lib/types';
 import { clsx } from './clsx';
 import { JobsIndicator } from './background-jobs';
 import { ThemeToggle } from './theme-toggle';
-import { StudentSidebar } from './student-sidebar';
 import { Logo } from './logo';
-import { isStudentOnly } from '@/lib/role-helpers';
+
+type Section = 'admin' | 'academic' | 'teachers' | 'student';
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   roles: Role[];
-  section: 'main' | 'academic' | 'finance' | 'me';
+  section: Section;
 }
 
-const ALL_ROLES: Role[] = ['SUPERADMIN','ADM','ACC','COM','INF','TEA','ANA','PHO','STU'];
+const ADMIN_ROLES: Role[] = ['SUPERADMIN', 'ADM'];
 
 const NAV: NavItem[] = [
-  { href: '/dashboard',    label: 'Сводка',        icon: Home,            roles: ALL_ROLES,                                 section: 'main' },
-  { href: '/admin/users',  label: 'Пользователи',  icon: Users,           roles: ['ADM'],                                    section: 'main' },
-  { href: '/applications', label: 'Заявки',        icon: Inbox,           roles: ['ADM', 'COM'],                             section: 'main' },
+  // Администрация
+  { href: '/admin/users', label: 'Пользователи', icon: Users,      roles: ADMIN_ROLES,           section: 'admin' },
+  { href: '/reports',     label: 'Отчёты',       icon: BarChart3,  roles: [...ADMIN_ROLES, 'ANA'], section: 'admin' },
+  { href: '/audit',       label: 'Аудит',        icon: ShieldAlert, roles: ['SUPERADMIN'],         section: 'admin' },
 
-  { href: '/admissions',   label: 'Абитуриент',    icon: UserPlus,        roles: ['ADM', 'COM'],                             section: 'academic' },
-  { href: '/students',     label: 'Студенты',      icon: GraduationCap,   roles: ['ADM', 'TEA', 'COM', 'ANA'],               section: 'academic' },
-  { href: '/curriculum',   label: 'Учебные планы', icon: BookOpen,        roles: ['ADM', 'TEA', 'ANA'],                      section: 'academic' },
-  { href: '/grades',       label: 'Ведомости',     icon: ClipboardCheck,  roles: ['ADM', 'TEA', 'ANA'],                      section: 'academic' },
+  // Учебная часть
+  { href: '/admissions',  label: 'Абитуриент',   icon: UserPlus,       roles: ['SUPERADMIN', 'COM'],          section: 'academic' },
+  { href: '/students',    label: 'Студенты',     icon: GraduationCap,  roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'academic' },
+  { href: '/certificates', label: 'Справки',     icon: FileText,       roles: [...ADMIN_ROLES, 'COM'],        section: 'academic' },
+  { href: '/orders',      label: 'Приказы',      icon: ScrollText,     roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'academic' },
 
-  { href: '/reports',      label: 'Отчёты',        icon: BarChart3,       roles: ['ADM', 'ANA'],                             section: 'finance' },
+  // Преподаватели
+  { href: '/grades',      label: 'Ведомости',    icon: ClipboardCheck, roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
+  { href: '/my-group',    label: 'Группа',       icon: UsersRound,     roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
 
-  { href: '/me',           label: 'Мой кабинет',   icon: UserCircle,      roles: ['STU', 'TEA', 'ACC', 'COM', 'ADM', 'ANA', 'INF', 'PHO'], section: 'me' },
+  // Студенты
+  { href: '/dashboard',   label: 'Сводка',       icon: Home,          roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
+  { href: '/applications', label: 'Заявки',      icon: Inbox,         roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
+  { href: '/me',          label: 'Мой кабинет',  icon: UserCircle,    roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
 ];
 
-const SECTION_LABELS: Record<NavItem['section'], string> = {
-  main:     'основное',
+const SECTION_LABELS: Record<Section, string> = {
+  admin:    'администрация',
   academic: 'учебная часть',
-  finance:  'отчёты',
-  me:       'личное',
+  teachers: 'преподаватели',
+  student:  'студент',
 };
+
+const SECTION_ORDER: Section[] = ['admin', 'academic', 'teachers', 'student'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, hasRole } = useAuth();
@@ -67,15 +79,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const initials = user ? `${user.lastName?.[0] ?? ''}${user.firstName?.[0] ?? ''}`.toUpperCase() : '';
 
-  const bySection = (['main', 'academic', 'finance', 'me'] as const).map((s) => ({
+  const bySection = SECTION_ORDER.map((s) => ({
     key: s,
     label: SECTION_LABELS[s],
     items: items.filter((i) => i.section === s),
   }));
 
-  const studentMode = isStudentOnly(user);
-
   const [menuOpen, setMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLocaleLowerCase('ru');
+  const isSearching = q.length > 0;
+  const matches = (label: string) => label.toLocaleLowerCase('ru').includes(q);
   // закрывать мобильное меню при навигации
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   // блокировать скролл фона, пока открыт оверлей
@@ -89,7 +103,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={clsx('app-shell', menuOpen && 'is-mobile-open')} style={{ display: 'flex', minHeight: '100vh', background: 'var(--ais-ink)', color: 'var(--ais-bone)' }}>
-      {studentMode ? <StudentSidebar mobileOpen={menuOpen} /> : (
       <aside className={clsx('sidebar', menuOpen && 'is-mobile-open')}>
         <Link href="/" className="sidebar__brand" aria-label="АИС Студент" style={{ padding: '4px 2px' }}>
           <Logo height={52} style={{ maxWidth: '100%' }} />
@@ -97,7 +110,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="input-group">
           <Search size={14} className="icon" />
-          <input className="input" placeholder="Поиск" aria-label="Поиск" style={{ padding: '8px 12px 8px 0', fontSize: 'var(--fs-13)' }} />
+          <input
+            className="input"
+            placeholder="Поиск"
+            aria-label="Поиск"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ padding: '8px 12px 8px 0', fontSize: 'var(--fs-13)' }}
+          />
         </div>
 
         <nav className="nav" aria-label="Основная навигация">
@@ -107,12 +127,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="nav__section">{sec.label}</div>
                 {sec.items.map((n) => {
                   const active = pathname === n.href || pathname?.startsWith(n.href + '/');
+                  const match = isSearching && matches(n.label);
+                  const dimmed = isSearching && !match;
                   const Icon = n.icon;
                   return (
                     <Link
                       key={n.href}
                       href={n.href}
-                      className={clsx('nav__item', active && 'is-active')}
+                      tabIndex={dimmed ? -1 : undefined}
+                      aria-disabled={dimmed || undefined}
+                      className={clsx(
+                        'nav__item',
+                        !isSearching && active && 'is-active',
+                        match && 'is-match',
+                        dimmed && 'is-dimmed',
+                      )}
                     >
                       <Icon size={16} className="icon" strokeWidth={1.75} />
                       <span>{n.label}</span>
@@ -148,7 +177,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-      )}
 
       {/* мобильный фон-оверлей */}
       <button

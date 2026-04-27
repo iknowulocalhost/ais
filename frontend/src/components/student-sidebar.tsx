@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -48,6 +49,10 @@ const SECTION_LABELS: Record<NavItem['section'], string> = {
 export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLocaleLowerCase('ru');
+  const isSearching = q.length > 0;
+  const matches = (label: string) => label.toLocaleLowerCase('ru').includes(q);
 
   const initials = user
     ? `${user.lastName?.[0] ?? ''}${user.firstName?.[0] ?? ''}`.toUpperCase()
@@ -75,8 +80,9 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
           className="input"
           placeholder="Поиск"
           aria-label="Поиск"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           style={{ padding: '8px 12px 8px 0', fontSize: 'var(--fs-13)' }}
-          // TODO: логика поиска
         />
       </div>
 
@@ -86,12 +92,21 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
             <div className="nav__section">{sec.label}</div>
             {sec.items.map((n) => {
               const active = pathname === n.href || pathname?.startsWith(n.href + '/');
+              const match = isSearching && matches(n.label);
+              const dimmed = isSearching && !match;
               const Icon = n.icon;
               return (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className={clsx('nav__item', active && 'is-active')}
+                  tabIndex={dimmed ? -1 : undefined}
+                  aria-disabled={dimmed || undefined}
+                  className={clsx(
+                    'nav__item',
+                    !isSearching && active && 'is-active',
+                    match && 'is-match',
+                    dimmed && 'is-dimmed',
+                  )}
                 >
                   <Icon size={16} className="icon" strokeWidth={1.75} />
                   <span>{n.label}</span>

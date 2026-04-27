@@ -1,7 +1,36 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Camera, RotateCcw, Video, VideoOff, Info } from 'lucide-react';
+import { Camera, RotateCcw, Video, VideoOff, Info, Upload } from 'lucide-react';
+
+const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_SIDE = 1024;
+
+async function fileToSquareDataUrl(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Не удалось прочитать изображение'));
+      i.src = url;
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const sx = (img.naturalWidth - side) / 2;
+    const sy = (img.naturalHeight - side) / 2;
+    const out = Math.min(side, MAX_SIDE);
+    const c = document.createElement('canvas');
+    c.width = out;
+    c.height = out;
+    const ctx = c.getContext('2d');
+    if (!ctx) throw new Error('canvas');
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, out, out);
+    return c.toDataURL('image/jpeg', 0.85);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 interface Props {
   value: string | null;
@@ -24,8 +53,35 @@ const RULES = [
 export function WebcamCapture({ value, onChange }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function pickFile() {
+    setError(null);
+    fileInputRef.current?.click();
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_MIME.includes(file.type)) {
+      setError('Допустимые форматы: PNG, JPEG, WebP');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError('Файл больше 5 МБ');
+      return;
+    }
+    try {
+      stopStream();
+      const dataUrl = await fileToSquareDataUrl(file);
+      onChange(dataUrl);
+    } catch {
+      setError('Не удалось обработать изображение');
+    }
+  }
 
   useEffect(() => () => stopStream(), []);
 
@@ -143,11 +199,16 @@ export function WebcamCapture({ value, onChange }: Props) {
 
         {error && <div className="field__error">{error}</div>}
 
-        <div className="row" style={{ gap: 'var(--s-2)' }}>
+        <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
           {!value && !active && (
-            <button type="button" className="btn btn--outline" onClick={start} style={{ flex: 1 }}>
-              <Video size={14} strokeWidth={1.75} /> Включить камеру
-            </button>
+            <>
+              <button type="button" className="btn btn--outline" onClick={start} style={{ flex: 1 }}>
+                <Video size={14} strokeWidth={1.75} /> Включить камеру
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={pickFile} style={{ flex: 1 }}>
+                <Upload size={14} strokeWidth={1.75} /> Загрузить с компьютера
+              </button>
+            </>
           )}
           {!value && active && (
             <>
@@ -160,10 +221,22 @@ export function WebcamCapture({ value, onChange }: Props) {
             </>
           )}
           {value && (
-            <button type="button" className="btn btn--outline" onClick={reset} style={{ flex: 1 }}>
-              <RotateCcw size={14} strokeWidth={1.75} /> Переснять
-            </button>
+            <>
+              <button type="button" className="btn btn--outline" onClick={reset} style={{ flex: 1 }}>
+                <RotateCcw size={14} strokeWidth={1.75} /> Переснять
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={pickFile}>
+                <Upload size={14} strokeWidth={1.75} /> Заменить файлом
+              </button>
+            </>
           )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={onFile}
+            style={{ display: 'none' }}
+          />
         </div>
       </div>
 

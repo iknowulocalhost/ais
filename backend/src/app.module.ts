@@ -16,6 +16,7 @@ import { ApplicationsModule } from './presentation/http/applications.module';
 import { CurriculumModule } from './presentation/http/curriculum.module';
 import { GradesModule } from './presentation/http/grades.module';
 import { AdmissionsModule } from './presentation/http/admissions.module';
+import { AuditModule } from './presentation/http/audit.module';
 import { ContextModule } from './infrastructure/context/context.module';
 import { NotificationsModule } from './infrastructure/notifications/notifications.module';
 import { BootstrapModule } from './infrastructure/bootstrap/bootstrap.module';
@@ -43,6 +44,7 @@ import { RolesGuard } from './presentation/http/auth/roles.guard';
     CurriculumModule,
     GradesModule,
     AdmissionsModule,
+    AuditModule,
     BootstrapModule,
   ],
   controllers: [HealthController],

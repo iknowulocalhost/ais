@@ -17,7 +17,8 @@
       "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
       "Bash(find . -path ./node_modules -prune -o -path ./*/node_modules -prune -o -path ./.git -prune -o -type f \\\\\\( -iname '*payment*' -o -iname '*Payment*' \\\\\\) -print)",
       "Bash(awk 'NR<172 || NR>181' frontend/src/lib/domain.ts)",
-      "Bash(mv /tmp/d.ts frontend/src/lib/domain.ts)"
+      "Bash(mv /tmp/d.ts frontend/src/lib/domain.ts)",
+      "Bash(docker volume *)"
     ]
   }
 }
