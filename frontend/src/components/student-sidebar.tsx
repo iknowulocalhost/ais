@@ -30,14 +30,14 @@ interface NavItem {
 // «Успеваемость» и «Учебный план» убраны: соответствующие /api/grades и
 // /api/curriculum требуют ролей ADM/TEA/ANA — студенту 403.
 const NAV: NavItem[] = [
-  { href: '/dashboard',     label: 'Сводка',       icon: Home,          section: 'main' },
-  { href: '/schedule',      label: 'Расписание',   icon: Calendar,      section: 'main' },
-  { href: '/notifications', label: 'Уведомления',  icon: Bell,          count: 3, section: 'main' },
+  { href: '/dashboard', label: 'Сводка', icon: Home, section: 'main' },
+  { href: '/schedule', label: 'Расписание', icon: Calendar, section: 'main' },
+  { href: '/notifications', label: 'Уведомления', icon: Bell, count: 3, section: 'main' },
 
-  { href: '/certificates',  label: 'Справки',      icon: FileText,      section: 'docs' },
-  { href: '/absences',      label: 'Пропуски',     icon: FileX,         section: 'docs' },
+  { href: '/certificates', label: 'Справки', icon: FileText, section: 'docs' },
+  { href: '/absences', label: 'Пропуски', icon: FileX, section: 'docs' },
 
-  { href: '/messages',      label: 'Сообщения',    icon: MessageSquare, section: 'comm' },
+  { href: '/messages', label: 'Сообщения', icon: MessageSquare, section: 'comm' },
 ];
 
 const SECTION_LABELS: Record<NavItem['section'], string> = {
@@ -71,7 +71,7 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
   return (
     <aside className={clsx('sidebar', mobileOpen && 'is-mobile-open')}>
       <Link href="/dashboard" className="sidebar__brand" aria-label="АИС" style={{ padding: '4px 2px' }}>
-        <Logo height={32} />
+        <Logo height={52} />
       </Link>
 
       <div className="input-group">
