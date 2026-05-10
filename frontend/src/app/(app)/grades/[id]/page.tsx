@@ -31,7 +31,7 @@ const GRADE_CLASS: Record<number, string> = {
 
 export default function GradeSheetDetailPage() {
   return (
-    <Protected roles={['ADM', 'TEA', 'ANA', 'STU']}>
+    <Protected roles={['ADM', 'TEA', 'ADMINISTRATION', 'STU']}>
       <GradeSheetDetail />
     </Protected>
   );

@@ -42,13 +42,13 @@ export class ReportsController {
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
   ) {}
 
-  @Roles(Role.ANA, Role.ADM, Role.ACC)
+  @Roles(Role.ADMINISTRATION, Role.ADM, Role.COM)
   @Post('exports')
   request(@Body() dto: RequestExportDto) {
     return this.requestUC.execute(dto.kind, dto.params ?? {});
   }
 
-  @Roles(Role.ANA, Role.ADM, Role.ACC)
+  @Roles(Role.ADMINISTRATION, Role.ADM, Role.COM)
   @Get('exports/:id')
   async status(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() actor: AuthenticatedUser) {
     const r = await this.reports.findById(id);

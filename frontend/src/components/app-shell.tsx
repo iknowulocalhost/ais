@@ -14,6 +14,10 @@ import {
   UserPlus,
   ScrollText,
   FileText,
+  KeyRound,
+  MessagesSquare,
+  BookOpen,
+  CalendarDays,
   ShieldAlert,
   UsersRound,
   Search,
@@ -39,35 +43,41 @@ interface NavItem {
   section: Section;
 }
 
-const ADMIN_ROLES: Role[] = ['SUPERADMIN', 'ADM'];
+const ADMIN_ROLES: Role[] = ['SUPERADMIN', 'ADM', 'ADMINISTRATION'];
 
 const NAV: NavItem[] = [
-  // Администрация
+  // ── Администрация ──
   { href: '/admin/users', label: 'Пользователи', icon: Users,      roles: ADMIN_ROLES,           section: 'admin' },
-  { href: '/reports',     label: 'Отчёты',       icon: BarChart3,  roles: [...ADMIN_ROLES, 'ANA'], section: 'admin' },
+  { href: '/admin/comment-options', label: 'Шаблоны комментариев', icon: MessagesSquare, roles: ADMIN_ROLES, section: 'admin' },
   { href: '/audit',       label: 'Аудит',        icon: ShieldAlert, roles: ['SUPERADMIN'],         section: 'admin' },
 
-  // Учебная часть
+  // ── Учебная часть ──
+  // (TEA сюда не пускаем — у него собственный кабинет, см. ниже)
   { href: '/admissions',  label: 'Абитуриент',   icon: UserPlus,       roles: ['SUPERADMIN', 'COM'],          section: 'academic' },
-  { href: '/students',    label: 'Студенты',     icon: GraduationCap,  roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'academic' },
-  { href: '/certificates', label: 'Справки',     icon: FileText,       roles: [...ADMIN_ROLES, 'COM'],        section: 'academic' },
-  { href: '/orders',      label: 'Приказы',      icon: ScrollText,     roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'academic' },
+  { href: '/dossier',     label: 'Студенты',     icon: GraduationCap,  roles: [...ADMIN_ROLES, 'COM'],        section: 'academic' },
+  { href: '/certificates', label: 'Справки',     icon: FileText,       roles: [...ADMIN_ROLES, 'COM', 'STU'], section: 'academic' },
+  { href: '/passes',      label: 'Пропуска',     icon: KeyRound,       roles: [...ADMIN_ROLES, 'COM', 'STU'], section: 'academic' },
+  { href: '/orders',      label: 'Приказы',      icon: ScrollText,     roles: [...ADMIN_ROLES, 'COM'],        section: 'academic' },
 
-  // Преподаватели
-  { href: '/grades',      label: 'Ведомости',    icon: ClipboardCheck, roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
-  { href: '/my-group',    label: 'Группа',       icon: UsersRound,     roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
+  // ── Преподаватели ──
+  // Группа = досье + бенто-grid его студентов; журнал/расписание + ведомости-отчёты.
+  { href: '/my-group',    label: 'Моя группа',   icon: UsersRound,     roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
+  { href: '/journal',     label: 'Журнал',       icon: BookOpen,       roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
+  { href: '/schedule',    label: 'Расписание',   icon: CalendarDays,   roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
+  { href: '/reports',     label: 'Ведомости и отчёты', icon: BarChart3, roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
 
-  // Студенты
-  { href: '/dashboard',   label: 'Сводка',       icon: Home,          roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
-  { href: '/applications', label: 'Заявки',      icon: Inbox,         roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
-  { href: '/me',          label: 'Мой кабинет',  icon: UserCircle,    roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
+  // ── Личный кабинет ──
+  { href: '/dashboard',   label: 'Сводка',       icon: Home,          roles: [...ADMIN_ROLES, 'COM', 'TEA', 'STU'], section: 'student' },
+  { href: '/applications', label: 'Мои заявки',   icon: Inbox,         roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
+  { href: '/me',          label: 'Мой профиль',  icon: UserCircle,    roles: [...ADMIN_ROLES, 'COM', 'TEA', 'STU'], section: 'student' },
 ];
 
+// «Кабинет» — общая личная зона (сводка/профиль). Раньше называлась «студент».
 const SECTION_LABELS: Record<Section, string> = {
   admin:    'администрация',
   academic: 'учебная часть',
   teachers: 'преподаватели',
-  student:  'студент',
+  student:  'кабинет',
 };
 
 const SECTION_ORDER: Section[] = ['admin', 'academic', 'teachers', 'student'];
@@ -104,8 +114,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={clsx('app-shell', menuOpen && 'is-mobile-open')} style={{ display: 'flex', minHeight: '100vh', background: 'var(--ais-ink)', color: 'var(--ais-bone)' }}>
       <aside className={clsx('sidebar', menuOpen && 'is-mobile-open')}>
-        <Link href="/" className="sidebar__brand" aria-label="АИС Студент" style={{ padding: '4px 2px' }}>
-          <Logo height={52} style={{ maxWidth: '100%' }} />
+        <Link href="/" className="sidebar__brand" aria-label="АИС" style={{ padding: '4px 2px' }}>
+          {/* В сайдбаре wordmark поспокойнее — без мигания, средняя высота. */}
+          <Logo height={32} />
         </Link>
 
         <div className="input-group">

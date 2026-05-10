@@ -4,6 +4,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QUEUES } from './queue.constants';
 import { AvatarProcessor } from './processors/avatar.processor';
 import { ReportExportProcessor } from './processors/report-export.processor';
+import { PoozabeduSyncProcessor } from './processors/poozabedu-sync.processor';
+import { SyncPoozabeduUseCase } from '../../application/use-cases/poozabedu/sync-poozabedu.use-case';
+import { AuditService } from '../../application/services/audit.service';
 
 @Global()
 @Module({
@@ -23,9 +26,16 @@ import { ReportExportProcessor } from './processors/report-export.processor';
       { name: QUEUES.AVATAR_PROCESSING },
       { name: QUEUES.REPORT_EXPORT },
       { name: QUEUES.NOTIFICATIONS },
+      { name: QUEUES.POOZABEDU_SYNC },
     ),
   ],
-  providers: [AvatarProcessor, ReportExportProcessor],
+  providers: [
+    AvatarProcessor,
+    ReportExportProcessor,
+    PoozabeduSyncProcessor,
+    SyncPoozabeduUseCase,
+    AuditService,
+  ],
   exports: [BullModule],
 })
 export class QueueModule {}

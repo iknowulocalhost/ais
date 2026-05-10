@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { homePathForRoles } from '@/lib/types';
 import { ApiError } from '@/lib/api';
+import { Logo } from '@/components/logo';
 
 /**
  * /login — парадный вход АИС.
@@ -61,8 +62,10 @@ export default function LoginPage() {
             className="max-w-[560px]"
           >
 
-            <h1 className="display" style={{ marginTop: 'var(--s-5)', fontSize: 'clamp(44px, 5.6vw, 68px)' }}>
-              АИС Студенты
+            <h1 className="display" style={{ marginTop: 'var(--s-5)', display: 'flex', alignItems: 'center' }}>
+              {/* Live-вариант знака — мигающая каретка работает индикатором,
+                  что система на связи и принимает заявки на вход. */}
+              <Logo height={88} live ariaLabel="АИС Студенты" />
             </h1>
 
             <div className="row" style={{ marginTop: 'var(--s-5)' }}>

@@ -5,12 +5,9 @@
 export type Role =
   | 'SUPERADMIN'
   | 'ADM'
-  | 'ACC'
+  | 'ADMINISTRATION'
   | 'COM'
-  | 'INF'
   | 'TEA'
-  | 'ANA'
-  | 'PHO'
   | 'STU';
 
 export interface AuthUser {
@@ -19,6 +16,12 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   roles: Role[];
+  /**
+   * ID сотрудника в Сетевом ПОО (poo.zabedu.ru), привязка к учётке АИС.
+   * Заполняется для TEA-учёток, чтобы фронт мог запросить, например, расписание
+   * именно этого преподавателя без отдельного похода в /api/users/me.
+   */
+  netschoolEmployeeId?: number | null;
 }
 
 export interface TokenPair {
@@ -34,12 +37,9 @@ export interface LoginResponse extends TokenPair {
 export const ROLE_LABELS: Record<Role, string> = {
   SUPERADMIN: 'Супер-админ',
   ADM: 'Администратор',
-  ACC: 'Бухгалтер',
-  COM: 'Приёмная комиссия',
-  INF: 'Информационный отдел',
-  TEA: 'Классный руководитель',
-  ANA: 'Аналитик',
-  PHO: 'Фотограф',
+  ADMINISTRATION: 'Администрация',
+  COM: 'Учебная часть',
+  TEA: 'Преподаватель',
   STU: 'Студент',
 };
 

@@ -54,7 +54,16 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
     bucket: string,
     key: string,
     ttlSeconds = 3600,
+    inline = true,
   ): Promise<string> {
+    // По умолчанию форсим inline-отдачу: квитанции и фото нужно открывать в
+    // соседней вкладке, а не скачивать как файл. Если когда-нибудь понадобится
+    // именно download — передайте inline=false.
+    if (inline) {
+      return this.client.presignedGetObject(bucket, key, ttlSeconds, {
+        'response-content-disposition': 'inline',
+      });
+    }
     return this.client.presignedGetObject(bucket, key, ttlSeconds);
   }
 

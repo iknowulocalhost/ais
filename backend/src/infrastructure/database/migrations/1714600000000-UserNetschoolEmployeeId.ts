@@ -1,0 +1,32 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+/**
+ * Привязка пользователя АИС к сотруднику в Сетевом ПОО (poo.zabedu.ru).
+ *
+ * Используется для RBAC роли TEA (классный руководитель): по этому полю
+ * сопоставляем `users.id` ↔ `poozabedu_student_group.curator_external_id`,
+ * чтобы определить «свои» группы и допустить просмотр только их журналов
+ * и студентов.
+ *
+ * Заполняется явно администратором при выдаче TEA-роли. Без проставленного
+ * значения TEA не сможет посмотреть ни одну группу — fail-closed.
+ */
+export class UserNetschoolEmployeeId1714600000000 implements MigrationInterface {
+  name = 'UserNetschoolEmployeeId1714600000000';
+
+  public async up(q: QueryRunner): Promise<void> {
+    await q.query(`
+      ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "netschool_employee_id" integer;
+    `);
+    await q.query(`
+      CREATE INDEX IF NOT EXISTS "ix_users_netschool_employee"
+      ON "users" ("netschool_employee_id");
+    `);
+  }
+
+  public async down(q: QueryRunner): Promise<void> {
+    await q.query(`DROP INDEX IF EXISTS "ix_users_netschool_employee";`);
+    await q.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "netschool_employee_id";`);
+  }
+}

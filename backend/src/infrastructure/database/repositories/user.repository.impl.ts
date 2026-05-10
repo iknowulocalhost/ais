@@ -60,7 +60,42 @@ export class TypeOrmUserRepository implements UserRepository {
       r.createdAt,
       r.updatedAt,
       r.lastLoginAt,
+      r.netschoolEmployeeId,
+      r.studentExternalId,
     );
+  }
+
+  async findByStudentExternalId(externalId: number): Promise<User | null> {
+    const row = await this.repo.findOne({ where: { studentExternalId: externalId } });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async syncActiveFromStudentMirror(): Promise<{ disabled: number; enabled: number }> {
+    // Дёшево и без лишних путешествий: два прицельных UPDATE'а через JOIN на
+    // зеркало студентов. Postgres поддерживает USING-форму DELETE/UPDATE.
+    const disabledRes = await this.repo.manager.query(`
+      UPDATE "users" u
+      SET "is_active" = false, "updated_at" = NOW()
+      FROM "poozabedu_student" s
+      WHERE u."student_external_id" IS NOT NULL
+        AND u."student_external_id" = s."external_id"
+        AND s."is_active" = false
+        AND u."is_active" = true
+    `);
+    const enabledRes = await this.repo.manager.query(`
+      UPDATE "users" u
+      SET "is_active" = true, "updated_at" = NOW()
+      FROM "poozabedu_student" s
+      WHERE u."student_external_id" IS NOT NULL
+        AND u."student_external_id" = s."external_id"
+        AND s."is_active" = true
+        AND u."is_active" = false
+    `);
+    // pg-driver возвращает [rows, count] для UPDATE. У TypeORM `query` —
+    // `[rowsAffected]` второй элемент или null; нормализуем.
+    const disabled = Array.isArray(disabledRes) && typeof disabledRes[1] === 'number' ? disabledRes[1] : 0;
+    const enabled = Array.isArray(enabledRes) && typeof enabledRes[1] === 'number' ? enabledRes[1] : 0;
+    return { disabled, enabled };
   }
 
   private toOrm(u: User): UserOrmEntity {
@@ -76,6 +111,8 @@ export class TypeOrmUserRepository implements UserRepository {
     row.createdAt = u.createdAt;
     row.updatedAt = u.updatedAt;
     row.lastLoginAt = u.lastLoginAt;
+    row.netschoolEmployeeId = u.netschoolEmployeeId;
+    row.studentExternalId = u.studentExternalId;
     return row;
   }
 }

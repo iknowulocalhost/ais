@@ -22,7 +22,7 @@ const SHEET_STATUS_VARIANT: Record<GradeSheetStatus, string> = {
 
 export default function GradeSheetsPage() {
   return (
-    <Protected roles={['ADM', 'TEA', 'ANA']}>
+    <Protected roles={['ADM', 'TEA', 'ADMINISTRATION']}>
       <GradeSheetsList />
     </Protected>
   );
@@ -42,7 +42,7 @@ function GradeSheetsList() {
       const d = await apiFetch<Page>('/api/grades/sheets', {
         query: {
           status: status || undefined,
-          teacherId: hasRole(['ADM', 'ANA']) ? undefined : user?.id,
+          teacherId: hasRole(['ADM', 'ADMINISTRATION']) ? undefined : user?.id,
           limit: 100,
         },
       });

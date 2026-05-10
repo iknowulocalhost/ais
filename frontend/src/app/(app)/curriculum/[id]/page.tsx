@@ -24,7 +24,7 @@ const PLAN_STATUS_VARIANT: Record<CurriculumPlanStatus, string> = {
 
 export default function CurriculumDetailPage() {
   return (
-    <Protected roles={['ADM', 'TEA', 'ANA']}>
+    <Protected roles={['ADM', 'TEA', 'ADMINISTRATION']}>
       <CurriculumDetail />
     </Protected>
   );

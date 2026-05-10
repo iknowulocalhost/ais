@@ -48,7 +48,7 @@ export class GradesController {
     return this.createSheetUC.execute({ ...dto, teacherId: actor.id });
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('sheets')
   listSheets(
     @Query() q: ListGradeSheetsQueryDto,
@@ -62,7 +62,7 @@ export class GradesController {
     );
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('sheets/:id')
   async oneSheet(@Param('id', new ParseUUIDPipe()) id: string) {
     const s = await this.sheets.findById(id);
@@ -70,7 +70,7 @@ export class GradesController {
     return s;
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA, Role.STU)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION, Role.STU)
   @Get('sheets/:id/grades')
   async sheetGrades(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.grades.findBySheetId(id);
@@ -102,7 +102,7 @@ export class GradesController {
 
   // ── Student transcript ────────────────────────────────
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA, Role.STU)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION, Role.STU)
   @Get('students/:studentId')
   async studentGrades(@Param('studentId', new ParseUUIDPipe()) studentId: string) {
     return this.grades.findByStudentId(studentId);

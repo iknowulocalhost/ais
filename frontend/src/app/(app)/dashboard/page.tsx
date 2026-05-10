@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { apiFetch, ApiError } from '@/lib/api';
 import { StudentDashboard } from '@/components/student-dashboard';
-import { isStudentOnly } from '@/lib/role-helpers';
+import { TeacherDashboard } from '@/components/teacher-dashboard';
+import { isStudentOnly, isTeacherOnly } from '@/lib/role-helpers';
 /**
  * /dashboard — сводка для сотрудников. Студенту рендерится StudentDashboard выше.
  */
@@ -28,6 +29,7 @@ const EMPTY: Summary = {
 export default function DashboardPage() {
   const { user } = useAuth();
   if (isStudentOnly(user)) return <StudentDashboard />;
+  if (isTeacherOnly(user)) return <TeacherDashboard />;
   return <AdminDashboard />;
 }
 
@@ -97,7 +99,7 @@ function AdminDashboard() {
         </div>
 
         <dl className="row" style={{ gap: 'var(--s-7)' }}>
-          <Stat label="студентов"   value={summary.studentsTotal}   href="/students" />
+          <Stat label="студентов"   value={summary.studentsTotal}   href="/dossier" />
           <Stat label="заявок"      value={summary.applicationsNew} href="/applications" tone={summary.applicationsNew ? 'accent' : 'default'} />
           <Stat label="ведомостей"  value={summary.sheetsOpen}      href="/grades" />
         </dl>

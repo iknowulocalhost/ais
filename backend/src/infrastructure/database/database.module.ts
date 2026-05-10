@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import * as path from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserOrmEntity } from './entities/user.orm-entity';
@@ -14,6 +15,14 @@ import { CurriculumEntryOrmEntity } from './entities/curriculum-entry.orm-entity
 import { GradeSheetOrmEntity } from './entities/grade-sheet.orm-entity';
 import { GradeOrmEntity } from './entities/grade.orm-entity';
 import { ApplicantOrmEntity } from './entities/applicant.orm-entity';
+import { PassOrmEntity } from './entities/pass.orm-entity';
+import { CertificateRequestOrmEntity } from './entities/certificate-request.orm-entity';
+import { CommentOptionOrmEntity } from './entities/comment-option.orm-entity';
+import {
+  PoozabeduDepartmentOrmEntity,
+  PoozabeduStudentGroupOrmEntity,
+  PoozabeduStudentOrmEntity,
+} from './entities/poozabedu-mirror.orm-entity';
 import { TypeOrmUserRepository } from './repositories/user.repository.impl';
 import { TypeOrmAuditLogRepository } from './repositories/audit-log.repository.impl';
 import { TypeOrmGroupRepository } from './repositories/group.repository.impl';
@@ -27,6 +36,14 @@ import { TypeOrmCurriculumEntryRepository } from './repositories/curriculum-entr
 import { TypeOrmGradeSheetRepository } from './repositories/grade-sheet.repository.impl';
 import { TypeOrmGradeRepository } from './repositories/grade.repository.impl';
 import { TypeOrmApplicantRepository } from './repositories/applicant.repository.impl';
+import { TypeOrmPassRepository } from './repositories/pass.repository.impl';
+import { TypeOrmCertificateRequestRepository } from './repositories/certificate-request.repository.impl';
+import { TypeOrmCommentOptionRepository } from './repositories/comment-option.repository.impl';
+import {
+  TypeOrmPoozabeduDepartmentRepository,
+  TypeOrmPoozabeduStudentGroupRepository,
+  TypeOrmPoozabeduStudentRepository,
+} from './repositories/poozabedu-mirror.repository.impl';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
 import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
 import { GROUP_REPOSITORY } from '../../domain/repositories/group.repository';
@@ -40,6 +57,14 @@ import { CURRICULUM_ENTRY_REPOSITORY } from '../../domain/repositories/curriculu
 import { GRADE_SHEET_REPOSITORY } from '../../domain/repositories/grade-sheet.repository';
 import { GRADE_REPOSITORY } from '../../domain/repositories/grade.repository';
 import { APPLICANT_REPOSITORY } from '../../domain/repositories/applicant.repository';
+import { PASS_REPOSITORY } from '../../domain/repositories/pass.repository';
+import { CERTIFICATE_REQUEST_REPOSITORY } from '../../domain/repositories/certificate-request.repository';
+import { COMMENT_OPTION_REPOSITORY } from '../../domain/repositories/comment-option.repository';
+import {
+  POOZABEDU_DEPARTMENT_REPOSITORY,
+  POOZABEDU_STUDENT_GROUP_REPOSITORY,
+  POOZABEDU_STUDENT_REPOSITORY,
+} from '../../domain/repositories/poozabedu-mirror.repository';
 
 const ORM_ENTITIES = [
   UserOrmEntity,
@@ -55,6 +80,12 @@ const ORM_ENTITIES = [
   GradeSheetOrmEntity,
   GradeOrmEntity,
   ApplicantOrmEntity,
+  PassOrmEntity,
+  CertificateRequestOrmEntity,
+  CommentOptionOrmEntity,
+  PoozabeduDepartmentOrmEntity,
+  PoozabeduStudentGroupOrmEntity,
+  PoozabeduStudentOrmEntity,
 ];
 
 @Global()
@@ -72,7 +103,14 @@ const ORM_ENTITIES = [
         database: cfg.get<string>('DB_NAME', 'ais_students'),
         entities: ORM_ENTITIES,
         synchronize: false,
-        migrationsRun: false,
+        // Автоматически прогоняем недостающие миграции при старте контейнера.
+        // Все наши миграции писаны идемпотентно (IF NOT EXISTS) — повторный
+        // прогон безопасен. typeorm пропустит уже отмеченные в `migrations` таблице.
+        migrationsRun: true,
+        // glob `*.{ts,js}` работает и в dev (ts-node читает .ts), и в production
+        // (Node читает скомпилированные .js из dist). __dirname укажет в нужное место.
+        migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
+        migrationsTableName: 'migrations',
         logging: cfg.get<string>('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error'],
       }),
     }),
@@ -92,6 +130,12 @@ const ORM_ENTITIES = [
     TypeOrmGradeSheetRepository,
     TypeOrmGradeRepository,
     TypeOrmApplicantRepository,
+    TypeOrmPassRepository,
+    TypeOrmCertificateRequestRepository,
+    TypeOrmCommentOptionRepository,
+    TypeOrmPoozabeduDepartmentRepository,
+    TypeOrmPoozabeduStudentGroupRepository,
+    TypeOrmPoozabeduStudentRepository,
     { provide: USER_REPOSITORY,             useExisting: TypeOrmUserRepository },
     { provide: AUDIT_LOG_REPOSITORY,        useExisting: TypeOrmAuditLogRepository },
     { provide: GROUP_REPOSITORY,            useExisting: TypeOrmGroupRepository },
@@ -105,6 +149,12 @@ const ORM_ENTITIES = [
     { provide: GRADE_SHEET_REPOSITORY,     useExisting: TypeOrmGradeSheetRepository },
     { provide: GRADE_REPOSITORY,           useExisting: TypeOrmGradeRepository },
     { provide: APPLICANT_REPOSITORY,       useExisting: TypeOrmApplicantRepository },
+    { provide: PASS_REPOSITORY,            useExisting: TypeOrmPassRepository },
+    { provide: CERTIFICATE_REQUEST_REPOSITORY, useExisting: TypeOrmCertificateRequestRepository },
+    { provide: COMMENT_OPTION_REPOSITORY,      useExisting: TypeOrmCommentOptionRepository },
+    { provide: POOZABEDU_DEPARTMENT_REPOSITORY, useExisting: TypeOrmPoozabeduDepartmentRepository },
+    { provide: POOZABEDU_STUDENT_GROUP_REPOSITORY, useExisting: TypeOrmPoozabeduStudentGroupRepository },
+    { provide: POOZABEDU_STUDENT_REPOSITORY,    useExisting: TypeOrmPoozabeduStudentRepository },
   ],
   exports: [
     USER_REPOSITORY,
@@ -120,6 +170,12 @@ const ORM_ENTITIES = [
     GRADE_SHEET_REPOSITORY,
     GRADE_REPOSITORY,
     APPLICANT_REPOSITORY,
+    PASS_REPOSITORY,
+    CERTIFICATE_REQUEST_REPOSITORY,
+    COMMENT_OPTION_REPOSITORY,
+    POOZABEDU_DEPARTMENT_REPOSITORY,
+    POOZABEDU_STUDENT_GROUP_REPOSITORY,
+    POOZABEDU_STUDENT_REPOSITORY,
     TypeOrmModule,
   ],
 })

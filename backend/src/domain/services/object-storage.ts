@@ -13,7 +13,7 @@ export interface PutObjectInput {
 
 export abstract class ObjectStorage {
   abstract putObject(input: PutObjectInput): Promise<void>;
-  abstract getPresignedGetUrl(bucket: string, key: string, ttlSeconds?: number): Promise<string>;
+  abstract getPresignedGetUrl(bucket: string, key: string, ttlSeconds?: number, inline?: boolean): Promise<string>;
   abstract getPresignedPutUrl(bucket: string, key: string, ttlSeconds?: number): Promise<string>;
   abstract deleteObject(bucket: string, key: string): Promise<void>;
   abstract ensureBucket(bucket: string): Promise<void>;
@@ -25,4 +25,6 @@ export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
 export const BUCKETS = {
   AVATARS: 'avatars',
   DOCUMENTS: 'documents',
+  /** Квитанции по заявкам на пропуск. Изолированы от студенческих доков. */
+  PASSES: 'passes',
 } as const;

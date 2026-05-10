@@ -70,8 +70,8 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
 
   return (
     <aside className={clsx('sidebar', mobileOpen && 'is-mobile-open')}>
-      <Link href="/dashboard" className="sidebar__brand" aria-label="АИС Студент" style={{ padding: '4px 2px' }}>
-        <Logo height={52} style={{ maxWidth: '100%' }} />
+      <Link href="/dashboard" className="sidebar__brand" aria-label="АИС" style={{ padding: '4px 2px' }}>
+        <Logo height={32} />
       </Link>
 
       <div className="input-group">

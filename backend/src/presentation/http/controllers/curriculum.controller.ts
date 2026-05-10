@@ -55,7 +55,7 @@ export class CurriculumController {
     return this.createDisciplineUC.execute(dto);
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('disciplines')
   listDisciplines(
     @Query() q: ListDisciplinesQueryDto,
@@ -65,7 +65,7 @@ export class CurriculumController {
     return this.disciplines.list({ search: q.search }, Number(limit), Number(offset));
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('disciplines/:id')
   async oneDiscipline(@Param('id', new ParseUUIDPipe()) id: string) {
     const d = await this.disciplines.findById(id);
@@ -81,7 +81,7 @@ export class CurriculumController {
     return this.createPlanUC.execute(dto);
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('plans')
   listPlans(
     @Query() q: ListCurriculumPlansQueryDto,
@@ -95,7 +95,7 @@ export class CurriculumController {
     );
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('plans/:id')
   async onePlan(@Param('id', new ParseUUIDPipe()) id: string) {
     const p = await this.plans.findById(id);
@@ -103,7 +103,7 @@ export class CurriculumController {
     return p;
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
   @Get('plans/:id/entries')
   async planEntries(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.entries.findByPlanId(id);

@@ -65,7 +65,7 @@ export class StudentsController {
     return this.createUC.execute(dto, ctx(req, ip, actor.id));
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.ANA, Role.COM)
+  @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION, Role.COM)
   @Get()
   async list(@Query() q: ListStudentsQueryDto, @Query('limit') limit = '50', @Query('offset') offset = '0') {
     return this.students.list(
@@ -75,7 +75,7 @@ export class StudentsController {
     );
   }
 
-  @Roles(Role.ADM, Role.TEA, Role.COM, Role.STU, Role.ANA)
+  @Roles(Role.ADM, Role.TEA, Role.COM, Role.STU, Role.ADMINISTRATION)
   @Get(':id')
   async one(@Param('id', new ParseUUIDPipe()) id: string) {
     const s = await this.students.findById(id);
@@ -92,7 +92,7 @@ export class StudentsController {
     return { url, ttlSeconds: 900 };
   }
 
-  @Roles(Role.ADM, Role.PHO, Role.STU)
+  @Roles(Role.ADM, Role.STU)
   @Post(':id/avatar')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_AVATAR_BYTES } }))
   async uploadAvatar(

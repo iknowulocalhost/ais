@@ -21,6 +21,13 @@ export interface JwtAccessPayload {
   sub: string;
   email: string;
   roles: Role[];
+  /**
+   * ID сотрудника в Сетевом ПОО, привязанный к аккаунту АИС (если есть).
+   * Используется для RBAC роли TEA, чтобы ограничить доступ к группам, в которых
+   * пользователь является классным руководителем. Прокладывается в JWT, чтобы
+   * guard'ы не лезли за этим в БД на каждом запросе.
+   */
+  netschoolEmployeeId: number | null;
 }
 
 export interface JwtRefreshPayload {
@@ -37,6 +44,7 @@ export interface LoginResult {
     firstName: string;
     lastName: string;
     roles: Role[];
+    netschoolEmployeeId: number | null;
   };
 }
 
@@ -72,7 +80,12 @@ export class LoginUseCase {
     }
 
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, roles: user.roles } as JwtAccessPayload,
+      {
+        sub: user.id,
+        email: user.email,
+        roles: user.roles,
+        netschoolEmployeeId: user.netschoolEmployeeId,
+      } as JwtAccessPayload,
       {
         secret: this.cfg.getOrThrow<string>('JWT_ACCESS_SECRET'),
         expiresIn: this.cfg.get<string>('JWT_ACCESS_TTL', '15m'),
@@ -111,6 +124,7 @@ export class LoginUseCase {
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles,
+        netschoolEmployeeId: user.netschoolEmployeeId,
       },
     };
   }

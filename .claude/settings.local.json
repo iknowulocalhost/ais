@@ -18,7 +18,8 @@
       "Bash(find . -path ./node_modules -prune -o -path ./*/node_modules -prune -o -path ./.git -prune -o -type f \\\\\\( -iname '*payment*' -o -iname '*Payment*' \\\\\\) -print)",
       "Bash(awk 'NR<172 || NR>181' frontend/src/lib/domain.ts)",
       "Bash(mv /tmp/d.ts frontend/src/lib/domain.ts)",
-      "Bash(docker volume *)"
+      "Bash(docker volume *)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\filatkinaa\\\\ais\\\\frontend\"; $out = npx tsc --noEmit 2>&1 | Out-String; $errs = $out -split \"`n\" | Where-Object { $_ -match 'error TS' -and $_ -notmatch 'lucide-react' -and $_ -notmatch 'payments/page' }; $errs | Select-Object -First 60)"
     ]
   }
 }

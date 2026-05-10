@@ -16,6 +16,12 @@ import { ApplicationsModule } from './presentation/http/applications.module';
 import { CurriculumModule } from './presentation/http/curriculum.module';
 import { GradesModule } from './presentation/http/grades.module';
 import { AdmissionsModule } from './presentation/http/admissions.module';
+import { PassesModule } from './presentation/http/passes.module';
+import { CertificatesModule } from './presentation/http/certificates.module';
+import { CommentOptionsModule } from './presentation/http/comment-options.module';
+import { LookupModule } from './presentation/http/lookup.module';
+import { PoozabeduApiModule } from './infrastructure/external/poozabeduapi/poozabeduapi.module';
+import { PoozabeduApiHttpModule } from './presentation/http/poozabeduapi.module';
 import { AuditModule } from './presentation/http/audit.module';
 import { ContextModule } from './infrastructure/context/context.module';
 import { NotificationsModule } from './infrastructure/notifications/notifications.module';
@@ -44,6 +50,12 @@ import { RolesGuard } from './presentation/http/auth/roles.guard';
     CurriculumModule,
     GradesModule,
     AdmissionsModule,
+    PassesModule,
+    CertificatesModule,
+    CommentOptionsModule,
+    LookupModule,
+    PoozabeduApiModule,
+    PoozabeduApiHttpModule,
     AuditModule,
     BootstrapModule,
   ],

@@ -92,6 +92,7 @@ export class RefreshUseCase {
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles,
+        netschoolEmployeeId: user.netschoolEmployeeId,
       },
     };
   }

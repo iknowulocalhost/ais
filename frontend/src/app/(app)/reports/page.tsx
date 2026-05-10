@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Printer } from 'lucide-react';
 import { Protected } from '@/components/protected';
+import { useAuth } from '@/lib/auth-context';
 import { apiFetch } from '@/lib/api';
 import { explainError } from '@/lib/errors';
 import { REPORT_KIND_LABELS, type ReportExport, type ReportKind } from '@/lib/domain';
@@ -16,7 +18,7 @@ import { useBackgroundJobs } from '@/components/background-jobs';
 
 export default function ReportsPage() {
   return (
-    <Protected roles={['ADM', 'ACC', 'ANA']}>
+    <Protected roles={['SUPERADMIN', 'ADM', 'ADMINISTRATION', 'COM', 'TEA']}>
       <ReportsView />
     </Protected>
   );
@@ -126,19 +128,24 @@ function ReportsView() {
         }}
       >
         <div className="col" style={{ gap: 'var(--s-2)' }}>
-          <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Отчёты</h1>
-          <p className="muted" style={{ fontSize: 'var(--fs-13)', maxWidth: '54ch' }}>
-            Экспорт формируется в фоне. Большие выгрузки не блокируют работу;
-            о завершении вы узнаете из тоста в правом нижнем углу.
+          <h1 className="display" style={{ fontSize: 'var(--fs-28)' }}>Ведомости и отчёты</h1>
+          <p className="muted" style={{ fontSize: 'var(--fs-13)', maxWidth: '64ch' }}>
+            Формирование академических отчётов: рейтинги групп, аттестационные ведомости,
+            посещаемость. Готовый отчёт можно отправить на печать.
           </p>
         </div>
       </header>
 
+      <PoozabeduReportsSection />
+
       {/* NEW EXPORT */}
       <section className="card">
         <span className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-          новый экспорт
+          Выгрузка реестров — XLSX
         </span>
+        <p className="muted" style={{ fontSize: 'var(--fs-12)', marginTop: 4, marginBottom: 0 }}>
+          Большие выгрузки готовятся в фоне. О готовности уведомим в правом нижнем углу.
+        </p>
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: 'var(--s-3)', marginTop: 'var(--s-4)' }}>
           <label className="field" style={{ minWidth: 260 }}>
             <span className="field__label">тип отчёта</span>
@@ -227,6 +234,262 @@ function ReportsView() {
         )}
       </section>
     </div>
+  );
+}
+
+// ────────── Сетевой ПОО — отчёты ──────────
+
+interface PzaGroup {
+  externalId: number;
+  name: string;
+  yearNumber: number | null;
+  departmentExternalId: number | null;
+  isActive: boolean;
+}
+interface PzaDepartment { externalId: number; name: string; isActive: boolean }
+
+type ReportNeeds = 'group' | 'group+term';
+interface ReportType { id: string; label: string; needs: ReportNeeds; description: string }
+
+const REPORT_TYPES: ReportType[] = [
+  {
+    id: 'group-attestation',
+    label: 'Аттестационная ведомость',
+    needs: 'group+term',
+    description: 'Отметки и зачёты за выбранный семестр.',
+  },
+  {
+    id: 'current-progress',
+    label: 'Текущая успеваемость',
+    needs: 'group+term',
+    description: 'Текущие отметки в течение семестра — по каждому предмету.',
+  },
+  {
+    id: 'attendance',
+    label: 'Посещаемость',
+    needs: 'group+term',
+    description: 'Пропуски уроков по уважительной и неуважительной причинам.',
+  },
+  {
+    id: 'rating',
+    label: 'Рейтинг группы',
+    needs: 'group+term',
+    description: 'Сводный рейтинг по аттестации и пропускам — для классного часа.',
+  },
+  {
+    id: 'debts',
+    label: 'Список задолженностей',
+    needs: 'group+term',
+    description: 'Студенты, имеющие хотя бы одно «не аттестован» по итогам семестра.',
+  },
+  {
+    id: 'group-students',
+    label: 'Список учебной группы',
+    needs: 'group',
+    description: 'Алфавитный реестр студентов группы.',
+  },
+];
+
+function PoozabeduReportsSection() {
+  const { user } = useAuth();
+  const [groups, setGroups] = useState<PzaGroup[] | null>(null);
+  const [departments, setDepartments] = useState<PzaDepartment[] | null>(null);
+  const [reportId, setReportId] = useState<ReportType['id']>('group-attestation');
+  const [departmentId, setDepartmentId] = useState<number | ''>('');
+  const [yearFilter, setYearFilter] = useState<number | ''>('');
+  const [groupSearch, setGroupSearch] = useState('');
+  const [groupId, setGroupId] = useState<number | ''>('');
+  const [term, setTerm] = useState<number>(new Date().getMonth() < 8 ? 2 : 1);
+  const [endDate, setEndDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  useEffect(() => {
+    apiFetch<PzaGroup[]>('/api/poozabeduapi/mirror/groups')
+      .then((g) => {
+        const active = g.filter((x) => x.isActive)
+          .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        setGroups(active);
+        if (active.length > 0) setGroupId(active[0].externalId);
+      })
+      .catch(() => setGroups([]));
+    apiFetch<PzaDepartment[]>('/api/poozabeduapi/mirror/departments')
+      .then((d) => setDepartments(d.filter((x) => x.isActive)))
+      .catch(() => setDepartments([]));
+  }, []);
+
+  const reportType = useMemo(
+    () => REPORT_TYPES.find((r) => r.id === reportId) ?? REPORT_TYPES[0],
+    [reportId],
+  );
+
+  // Все курсы, реально встречающиеся в активных группах — для селекта.
+  const availableYears = useMemo(() => {
+    if (!groups) return [];
+    const set = new Set<number>();
+    for (const g of groups) if (g.yearNumber !== null) set.add(g.yearNumber);
+    return [...set].sort((a, b) => a - b);
+  }, [groups]);
+
+  // Применяем фильтры к списку групп.
+  const filteredGroups = useMemo(() => {
+    if (!groups) return [];
+    const q = groupSearch.trim().toLowerCase();
+    return groups.filter((g) => {
+      if (departmentId !== '' && g.departmentExternalId !== departmentId) return false;
+      if (yearFilter !== '' && g.yearNumber !== yearFilter) return false;
+      if (q && !g.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [groups, departmentId, yearFilter, groupSearch]);
+
+  // Если текущая выбранная группа отфильтровалась — переключаемся на первую видимую.
+  useEffect(() => {
+    if (groupId === '' || filteredGroups.length === 0) return;
+    if (!filteredGroups.some((g) => g.externalId === groupId)) {
+      setGroupId(filteredGroups[0].externalId);
+    }
+  }, [filteredGroups, groupId]);
+
+  function openReport() {
+    if (!groupId) return;
+    const qs = new URLSearchParams({ type: reportType.id, groupId: String(groupId) });
+    if (reportType.needs === 'group+term') {
+      qs.set('term', String(term));
+      qs.set('date', endDate);
+    }
+    window.open(`/reports/print?${qs.toString()}`, '_blank', 'noopener');
+  }
+
+  function resetFilters() {
+    setDepartmentId('');
+    setYearFilter('');
+    setGroupSearch('');
+  }
+
+  const isTeaOnly =
+    !!user?.roles.includes('TEA') &&
+    !user.roles.includes('SUPERADMIN') && !user.roles.includes('ADM') && !user.roles.includes('COM');
+
+  return (
+    <section className="card col" style={{ gap: 'var(--s-4)' }}>
+      <header className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--s-2)' }}>
+        <div className="col" style={{ gap: 4 }}>
+          <span className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
+            Академические отчёты
+          </span>
+          <p className="muted" style={{ margin: 0, fontSize: 'var(--fs-12)' }}>
+            {isTeaOnly
+              ? 'Доступны отчёты по вашей группе.'
+              : 'Доступны отчёты по любой группе техникума. Используйте фильтры, чтобы быстро найти нужную.'}
+          </p>
+        </div>
+      </header>
+
+      {/* ── Тип отчёта ── */}
+      <div className="col" style={{ gap: 'var(--s-2)' }}>
+        <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Тип отчёта</span>
+        <select className="input" value={reportId} onChange={(e) => setReportId(e.target.value)}>
+          {REPORT_TYPES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+        </select>
+        <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>{reportType.description}</span>
+      </div>
+
+      {/* ── Фильтры по группам ── */}
+      {!isTeaOnly && (groups?.length ?? 0) > 1 && (
+        <div className="col" style={{ gap: 'var(--s-2)' }}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
+              Фильтры
+            </span>
+            {(departmentId !== '' || yearFilter !== '' || groupSearch) && (
+              <button onClick={resetFilters} className="btn btn--ghost btn--sm" type="button">Сбросить</button>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--s-3)' }}>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Отделение</span>
+              <select
+                className="input"
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value === '' ? '' : Number(e.target.value))}
+              >
+                <option value="">Все отделения</option>
+                {departments?.map((d) => (
+                  <option key={d.externalId} value={d.externalId}>{d.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Курс</span>
+              <select
+                className="input"
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value === '' ? '' : Number(e.target.value))}
+              >
+                <option value="">Все курсы</option>
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>{y} курс</option>
+                ))}
+              </select>
+            </label>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Поиск группы</span>
+              <input
+                type="text"
+                className="input"
+                placeholder="например, КС-21"
+                value={groupSearch}
+                onChange={(e) => setGroupSearch(e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* ── Параметры отчёта ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s-3)' }}>
+        <label className="col" style={{ gap: 4 }}>
+          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Группа</span>
+          <select className="input" value={groupId} onChange={(e) => setGroupId(e.target.value === '' ? '' : Number(e.target.value))}>
+            <option value="">—</option>
+            {filteredGroups.map((g) => (
+              <option key={g.externalId} value={g.externalId}>
+                {g.name}{g.yearNumber !== null ? ` · ${g.yearNumber} к.` : ''}
+              </option>
+            ))}
+          </select>
+          {filteredGroups.length === 0 && groups && groups.length > 0 && (
+            <span className="muted" style={{ fontSize: 11 }}>По выбранным фильтрам групп не найдено</span>
+          )}
+        </label>
+        {reportType.needs === 'group+term' && (
+          <>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Семестр</span>
+              <select className="input" value={term} onChange={(e) => setTerm(Number(e.target.value))}>
+                <option value={1}>I семестр (осень)</option>
+                <option value={2}>II семестр (весна)</option>
+              </select>
+            </label>
+            <label className="col" style={{ gap: 4 }}>
+              <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>На дату</span>
+              <input type="date" className="input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </label>
+          </>
+        )}
+      </div>
+
+      <div className="row" style={{ gap: 'var(--s-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn--primary btn--sm" onClick={openReport} disabled={!groupId}>
+          <Printer size={14} strokeWidth={1.75} /> Открыть ведомость
+        </button>
+        <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>
+          Откроется в новой вкладке, оттуда можно отправить документ на печать.
+        </span>
+      </div>
+    </section>
   );
 }
 

@@ -17,6 +17,18 @@ export class User {
     public readonly createdAt: Date,
     public updatedAt: Date,
     public lastLoginAt: Date | null = null,
+    /**
+     * ID сотрудника в Сетевом ПОО (poo.zabedu.ru). Заполняется для пользователей
+     * с ролью TEA, чтобы понимать, чьим классным руководителем они являются.
+     * Без этой связи TEA не сможет получить доступ ни к одной группе.
+     */
+    public netschoolEmployeeId: number | null = null,
+    /**
+     * external_id студента из зеркала Сетевого ПОО (`poozabedu_student.external_id`).
+     * Заполняется для учёток студентов, которые админ выдаёт через досье или массовое
+     * создание паролей. Позволяет за O(1) находить аккаунт студента по ID карточки.
+     */
+    public studentExternalId: number | null = null,
   ) {}
 
   hasRole(role: Role): boolean {

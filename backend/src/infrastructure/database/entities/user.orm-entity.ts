@@ -48,4 +48,10 @@ export class UserOrmEntity {
 
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt!: Date | null;
+
+  @Column({ name: 'netschool_employee_id', type: 'integer', nullable: true })
+  netschoolEmployeeId!: number | null;
+
+  @Column({ name: 'student_external_id', type: 'integer', nullable: true })
+  studentExternalId!: number | null;
 }

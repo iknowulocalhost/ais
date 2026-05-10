@@ -8,6 +8,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   roles: JwtAccessPayload['roles'];
+  netschoolEmployeeId: number | null;
 }
 
 @Injectable()
@@ -21,6 +22,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   validate(payload: JwtAccessPayload): AuthenticatedUser {
-    return { id: payload.sub, email: payload.email, roles: payload.roles };
+    return {
+      id: payload.sub,
+      email: payload.email,
+      roles: payload.roles,
+      // Старые токены, выпущенные до введения поля, не содержат его — нормализуем к null.
+      netschoolEmployeeId: payload.netschoolEmployeeId ?? null,
+    };
   }
 }
