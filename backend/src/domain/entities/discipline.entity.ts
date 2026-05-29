@@ -1,7 +1,3 @@
-/**
- * Дисциплина (предмет).
- * Привязана к программам через CurriculumEntry.
- */
 export class Discipline {
   constructor(
     public readonly id: string,

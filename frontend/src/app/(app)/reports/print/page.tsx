@@ -7,23 +7,6 @@ import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
 
-/**
- * Печатное представление отчёта Сетевого ПОО.
- *
- * Открывается отдельной вкладкой через `/reports/print?type=...&groupId=...`
- * и отрисовывается как академический документ А4: шапка организации, заголовок
- * ведомости, таблица данных и подписи. Кнопка «Печать» вызывает диалог печати,
- * `@media print` скрывает шапку приложения и панель тулбара — на бумагу
- * уходит только сам документ.
- *
- * Поддерживаемые типы:
- *   - group-attestation: аттестационная ведомость (матрица студент × предмет)
- *   - rating: рейтинг группы за семестр (посещаемость + аттестовано/не аттестовано)
- *   - group-students: алфавитный список группы
- *
- * Расширение: добавить новый `type` сюда и описать рендер в `renderBody`.
- */
-
 // ─────── типы ответов API ───────
 
 interface MirrorGroup {
@@ -111,7 +94,6 @@ function ReportPrintView() {
     let cancelled = false;
     (async () => {
       try {
-        // Параллельно: справочник групп (для имени и формы обучения) и сами данные отчёта.
         const [groups, payload] = await Promise.all([
           apiFetch<MirrorGroup[]>('/api/poozabeduapi/mirror/groups'),
           apiFetch<unknown>('/api/poozabeduapi/reports', { query: { path: pathFor(type, groupId, term, date) } }),
@@ -333,7 +315,6 @@ function AttendanceTable({ data }: { data: RatingData }) {
 
 function DebtsTable({ data }: { data: RatingData }) {
   if (!data?.students) return <p className="muted-print">Данные о задолженностях пусты.</p>;
-  // «Должник» — у кого хотя бы одно «не аттестован» по итогам семестра.
   const students = data.students
     .filter((s) => (s.progress?.notCertified ?? 0) > 0)
     .sort((a, b) => {
@@ -445,23 +426,16 @@ function pathFor(type: string, groupId: number, term: number, date: string): str
   const d = date || todayIso();
   switch (type) {
     case 'group-attestation':
-      // Без префикса `Semester/{term}/{date}` upstream возвращает аттестацию
-      // «за всё время обучения» — у старшекурсников в списке торчат предметы
-      // 1-го курса. Берём тот же префикс, что у `rating`, чтобы получить срез
-      // по конкретному семестру.
+      // префикс Semester/{term}/{date} даёт срез семестра, без него — за всё время обучения
       return `curator/group-attestation/Semester/${t}/${d}/${groupId}`;
     case 'current-progress':
-      // Текущие отметки за семестр — структура ответа совпадает с group-attestation,
-      // отличается только источник (текущий, не итоговый журнал).
       return `curator/group-current-progress/Semester/${t}/${d}/${groupId}`;
     case 'attendance':
-      // Сводка пропусков по студентам за период.
       return `curator/group-attendance/Semester/${t}/${d}/${groupId}`;
     case 'rating':
       return `curator/rating/Semester/${t}/${d}/${groupId}`;
     case 'debts':
-      // Используем тот же эндпоинт, что и rating: бэкенд upstream'а отдаёт
-      // progress.notCertified — фильтрацию делаем на клиенте.
+      // тот же эндпоинт, что rating; фильтр notCertified — на клиенте
       return `curator/rating/Semester/${t}/${d}/${groupId}`;
     case 'group-students':
       return `group/${groupId}/students`;

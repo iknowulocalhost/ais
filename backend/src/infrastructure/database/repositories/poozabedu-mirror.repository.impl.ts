@@ -160,6 +160,25 @@ export class TypeOrmPoozabeduStudentRepository implements PoozabeduStudentReposi
     const r = await this.repo.findOne({ where: { externalId } });
     return r ? toDomainStudent(r) : null;
   }
+
+  async findByFullName(
+    lastName: string,
+    firstName: string,
+    middleName: string | null,
+  ): Promise<PoozabeduStudent[]> {
+    const qb = this.repo.createQueryBuilder('s')
+      .where('LOWER(TRIM(s.last_name)) = LOWER(TRIM(:l))', { l: lastName })
+      .andWhere('LOWER(TRIM(s.first_name)) = LOWER(TRIM(:f))', { f: firstName });
+    // Если в АИС у пользователя отчество не задано — соглашаемся на любого
+    // студента из зеркала по фамилии+имени. Это типично для иностранцев,
+    // и сужать здесь — значит ломать кейс «фио без отчества».
+    if (middleName !== null && middleName.trim() !== '') {
+      qb.andWhere('LOWER(TRIM(s.middle_name)) = LOWER(TRIM(:m))', { m: middleName });
+    }
+    qb.andWhere('s.is_active = true');
+    const rows = await qb.getMany();
+    return rows.map(toDomainStudent);
+  }
 }
 
 // ────────── мапперы ──────────

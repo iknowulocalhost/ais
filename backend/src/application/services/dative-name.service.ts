@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const petrovich = require('petrovich') as PetrovichApi;
 
-/**
- * Тонкий типизированный шим над npm `petrovich`. Пакет — чистый JS без типов,
- * поэтому объявляем форму API локально, чтобы остальной код не возился с `any`.
- */
+// petrovich — JS-пакет без типов, объявляем локально
 type Gender = 'male' | 'female' | 'androgynous';
 type Case =
   | 'nominative' | 'genitive' | 'dative'
@@ -23,10 +20,7 @@ interface PetrovichApi {
   detect_gender(middle: string): Gender;
 }
 
-/**
- * Сервис склонения ФИО. Используем для авто-генерации `fullNameDat` при подаче справки;
- * оператор всегда может скорректировать вручную (petrovich даёт ~95% точности).
- */
+/** Склонение ФИО (petrovich) — для авто-fullNameDat при подаче справок. */
 @Injectable()
 export class DativeNameService {
   private readonly logger = new Logger(DativeNameService.name);

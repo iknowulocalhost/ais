@@ -1,6 +1,3 @@
-/**
- * Запись учебного плана: какая дисциплина в каком семестре и какой формой контроля.
- */
 export type ControlForm = 'EXAM' | 'CREDIT' | 'DIFF_CREDIT' | 'COURSEWORK';
 
 export class CurriculumEntry {

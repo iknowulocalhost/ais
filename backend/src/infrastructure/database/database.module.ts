@@ -23,6 +23,7 @@ import {
   PoozabeduStudentGroupOrmEntity,
   PoozabeduStudentOrmEntity,
 } from './entities/poozabedu-mirror.orm-entity';
+import { MaxLinkTokenOrmEntity } from './entities/max-link-token.orm-entity';
 import { TypeOrmUserRepository } from './repositories/user.repository.impl';
 import { TypeOrmAuditLogRepository } from './repositories/audit-log.repository.impl';
 import { TypeOrmGroupRepository } from './repositories/group.repository.impl';
@@ -86,6 +87,7 @@ const ORM_ENTITIES = [
   PoozabeduDepartmentOrmEntity,
   PoozabeduStudentGroupOrmEntity,
   PoozabeduStudentOrmEntity,
+  MaxLinkTokenOrmEntity,
 ];
 
 @Global()

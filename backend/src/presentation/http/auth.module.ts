@@ -4,6 +4,8 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './controllers/auth.controller';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { LoginUseCase } from '../../application/use-cases/auth/login.use-case';
+import { LdapLoginUseCase } from '../../application/use-cases/auth/ldap-login.use-case';
+import { LdapClientService } from '../../infrastructure/external/ldap/ldap-client.service';
 import { RefreshUseCase } from '../../application/use-cases/auth/refresh.use-case';
 import { LogoutUseCase } from '../../application/use-cases/auth/logout.use-case';
 import { ChangePasswordUseCase } from '../../application/use-cases/auth/change-password.use-case';
@@ -21,6 +23,8 @@ import { REFRESH_TOKEN_STORE } from '../../domain/services/refresh-token-store';
   providers: [
     JwtStrategy,
     LoginUseCase,
+    LdapLoginUseCase,
+    LdapClientService,
     RefreshUseCase,
     LogoutUseCase,
     ChangePasswordUseCase,

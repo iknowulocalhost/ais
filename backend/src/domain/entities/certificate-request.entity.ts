@@ -1,9 +1,3 @@
-/**
- * Заявка на справку (об обучении / стипендии / доходах / налоговом вычете / в военкомат).
- *
- * Жизненный цикл: PENDING → APPROVED | REJECTED.
- * Студент создаёт публично; ADM/COM/SUPERADMIN рулят статусом и печатают.
- */
 export type CertificateType =
   | 'STUDY'
   | 'SCHOLARSHIP'
@@ -16,12 +10,7 @@ export type CertificateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export class CertificateRequest {
   constructor(
     public readonly id: string,
-    /**
-     * Человекочитаемый номер справки («С-42»). Инкрементная sequence в БД,
-     * присваивается БД при INSERT. UUID `id` остаётся первичным ключом и
-     * используется в URL/API; displayNo — только для печатных форм и UI.
-     * Может быть null до записи в БД.
-     */
+    /** Человекочитаемый номер справки («С-42»). Sequence из БД; null до INSERT. */
     public readonly displayNo: number | null,
     public certType: CertificateType,
     public fullName: string,
@@ -38,11 +27,7 @@ export class CertificateRequest {
     public reviewerId: string | null,
     public maxUserId: string | null,
     public submitterUserId: string | null,
-    /**
-     * ФИО в дательном падеже («Иванову Ивану Ивановичу»).
-     * Авто-генерируется через petrovich при подаче, оператор может править в карточке.
-     * Печатные формы используют именно это поле; при `null` — fallback на nominative.
-     */
+    /** ФИО в дательном падеже («Иванову Ивану Ивановичу»). */
     public fullNameDat: string | null,
     public readonly createdAt: Date,
     public updatedAt: Date,

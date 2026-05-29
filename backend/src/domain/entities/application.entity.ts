@@ -1,16 +1,3 @@
-/**
- * Заявка абитуриента. Ведётся приёмной комиссией (COM).
- *
- * Жизненный цикл:
- *   SUBMITTED      — только что подана (публично, без авторизации)
- *   UNDER_REVIEW   — COM взял в работу
- *   ACCEPTED       — принята к зачислению (ещё не зачислен)
- *   REJECTED       — отказ с reason
- *   ENROLLED       — зачислен (создан Student со статусом ENROLLED)
- *
- * Переходы: SUBMITTED → UNDER_REVIEW → { ACCEPTED → ENROLLED | REJECTED }.
- * Возврат в UNDER_REVIEW из ACCEPTED разрешён (пока не ENROLLED), чтобы COM мог переиграть.
- */
 export type ApplicationStatus =
   | 'SUBMITTED'
   | 'UNDER_REVIEW'

@@ -4,25 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, User } from 'lucide-react';
 import { apiFetch, ApiError } from '@/lib/api';
 
-/**
- * Универсальный пикер студента из зеркала Сетевого ПОО (`/api/poozabeduapi/mirror/*`).
- *
- * Сценарий работы:
- *  1. Опционально оператор сужает выбор группой (дропдаун из 85 групп — кэшируем
- *     на инстанс компонента, грузим один раз).
- *  2. Вводит часть фамилии — debounced-поиск по `/mirror/students` с фильтром по группе.
- *  3. Кликает на студента → компонент эмитит `PickedStudent` родителю.
- *
- * Намеренно не кешируем результаты поиска долго — список студентов меняется при
- * sync, и пикер должен всегда показывать актуальные данные.
- */
+/** Пикер студента из зеркала Сетевого ПОО (`/api/poozabeduapi/mirror/*`): группа + debounced поиск. */
 
 export interface PickedStudent {
   externalId: number;
   lastName: string;
   firstName: string;
   middleName: string | null;
-  birthDate: string | null;        // ISO yyyy-mm-dd
+  birthDate: string | null;
   groupExternalId: number | null;
   groupName: string | null;
 }

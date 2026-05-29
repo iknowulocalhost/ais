@@ -12,12 +12,7 @@ import {
   PoozabeduStudentGroupRepository,
 } from '../../../domain/repositories/poozabedu-mirror.repository';
 
-/**
- * On-demand-проксирование журнала из Сетевого ПОО.
- * Никаких сохранений в нашу БД: все вызовы — live, ничего не кэшируется.
- * Каждый запрос про оценки/пропуски пишется в audit_log с `READ_SENSITIVE`,
- * чтобы понять «кто, когда и по какой группе/предмету заглядывал».
- */
+/** Прокси к журналу Сетевого ПОО (live, без кэша; каждое чтение — READ_SENSITIVE). */
 @Injectable()
 export class GetJournalUseCase {
   constructor(
@@ -50,15 +45,7 @@ export class GetJournalUseCase {
     return result;
   }
 
-  /**
-   * Журнал по предмету. Если передан `constraints.allowedCuratorEmployeeId`
-   * (актор — TEA), дополнительно проверяем, что `gradebookId` принадлежит одной из
-   * его групп. Это защита от перебора прямых URL мимо UI: id журнала ≠ id группы,
-   * без проверки TEA технически мог бы получить любой gradebook через адресную строку.
-   *
-   * Стоимость проверки: 1 upstream-запрос на каждую группу TEA. На практике у одного
-   * классрука 1-2 группы — задержка <1 секунды.
-   */
+  /** Журнал по предмету. Для TEA: проверка, что gradebookId — из своих групп. */
   async getSubject(
     gradebookId: number,
     subjectId: number,

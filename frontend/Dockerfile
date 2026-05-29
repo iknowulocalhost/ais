@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 FROM node:20-alpine AS base
 WORKDIR /app
-COPY package.json ./
+COPY package*.json ./
 RUN npm install --no-audit --no-fund
 
 # ---------- development ----------

@@ -1,16 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Привязка заявок к авторизованному пользователю + хранение ФИО в дательном падеже.
- *
- * - `passes.submitter_user_id`         — кто создал заявку (STU через АИС или ADM/COM от его имени).
- * - `certificate_requests.submitter_user_id` — то же для справок.
- * - `certificate_requests.full_name_dat` — автоматически заполняется petrovich при подаче,
- *   оператор может скорректировать в карточке справки. В печати используется именно это поле.
- *
- * Существующие записи (если какие-то прошли через старый Public-путь) останутся с NULL —
- * это легитимный случай «заявка от анонимного источника».
- */
+/** passes/certificate_requests.submitter_user_id + certificate_requests.full_name_dat. */
 export class OwnershipAndDative1714400000000 implements MigrationInterface {
   name = 'OwnershipAndDative1714400000000';
 

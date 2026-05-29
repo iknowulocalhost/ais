@@ -1,9 +1,5 @@
 import { Role } from '../enums/role.enum';
 
-/**
- * Доменная сущность User.
- * НЕ зависит от ORM и фреймворков — чистая бизнес-модель.
- */
 export class User {
   constructor(
     public readonly id: string,
@@ -17,18 +13,14 @@ export class User {
     public readonly createdAt: Date,
     public updatedAt: Date,
     public lastLoginAt: Date | null = null,
-    /**
-     * ID сотрудника в Сетевом ПОО (poo.zabedu.ru). Заполняется для пользователей
-     * с ролью TEA, чтобы понимать, чьим классным руководителем они являются.
-     * Без этой связи TEA не сможет получить доступ ни к одной группе.
-     */
+    /** ID сотрудника в Сетевом ПОО (для роли TEA — связь с группами, где он куратор). */
     public netschoolEmployeeId: number | null = null,
-    /**
-     * external_id студента из зеркала Сетевого ПОО (`poozabedu_student.external_id`).
-     * Заполняется для учёток студентов, которые админ выдаёт через досье или массовое
-     * создание паролей. Позволяет за O(1) находить аккаунт студента по ID карточки.
-     */
+    /** external_id студента из зеркала Сетевого ПОО. */
     public studentExternalId: number | null = null,
+    /** Доменный логин в AD (sAMAccountName). */
+    public samAccountName: string | null = null,
+    /** chat_id в MAX — целевой адрес уведомлений, если задан. */
+    public maxChatId: string | null = null,
   ) {}
 
   hasRole(role: Role): boolean {

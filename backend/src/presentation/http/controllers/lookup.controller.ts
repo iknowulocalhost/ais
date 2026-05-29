@@ -25,22 +25,13 @@ export class LookupController {
     private readonly studentDetailUc: GetStudentDetailUseCase,
   ) {}
 
-  /**
-   * Поиск студента в исторических CSV-выгрузках по ФИО.
-   * Если CSV не покрывает запись — добираем дату/номер приказа о зачислении
-   * из живого досье Сетевого ПОО (decrees[type=Enroll]). Это позволяет печатать
-   * корректные справки для свежезачисленных студентов, которых ещё нет в CSV.
-   * Используется печатными формами справок для автозаполнения.
-   * Доступно сотрудникам — данные содержат ПДн.
-   */
+  /** GET /lookup/order — CSV + добор из Сетевого ПОО для печатных справок. */
   @Roles(Role.SUPERADMIN, Role.ADM, Role.COM)
   @Get('order')
   async byFullName(@Query() q: LookupQueryDto): Promise<OrderLookupResult> {
     const csv = this.lookup.lookupByFullName(q.fullName);
-    // Если CSV дал и enrollDate, и orderNumber, и gradYear — этого достаточно.
     if (csv.found && csv.enrollDate && csv.orderNumber && csv.gradYear) return csv;
 
-    // Иначе пробуем найти студента в зеркале и поднять decrees из upstream.
     const enrich = await this.enrichFromDossier(q.fullName).catch(() => null);
     if (!enrich) return csv;
     return {
@@ -53,12 +44,7 @@ export class LookupController {
     };
   }
 
-  /**
-   * Подсасывает данные о приказе о зачислении из живого досье Сетевого ПОО.
-   * Год выпуска угадывает по дате приказа + 4 года (длительность СПО) — грубо,
-   * но лучше пустого поля; если в CSV специальность есть, реальная длительность
-   * берётся уже оттуда выше по слиянию.
-   */
+  /** Добор enrollDate/order/grad из досье Сетевого ПОО (decrees[Enroll]). gradYear = enrollYear+4. */
   private async enrichFromDossier(fullName: string): Promise<{
     found: boolean;
     enrollDate?: string;
@@ -87,8 +73,6 @@ export class LookupController {
     const enrollIso = parseDateToIso(enrollDecree.effectiveDate ?? enrollDecree.date);
     if (!enrollIso) return { found: false };
     const enrollYear = Number(enrollIso.slice(0, 4));
-    // Дефолт по СПО — 4 года; если CSV знает специальность точнее, оно уже
-    // переписало gradYear.
     const gradYear = enrollYear + 4;
     const today = new Date();
     const acYearStart = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;

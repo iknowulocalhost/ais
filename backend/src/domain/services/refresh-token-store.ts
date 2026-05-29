@@ -1,13 +1,4 @@
-/**
- * Порт хранилища refresh-токенов.
- * Реализация — Redis (infrastructure/cache).
- *
- * Модель: храним хеш refresh-токена под ключом `refresh:{userId}:{jti}`
- * с TTL = JWT_REFRESH_TTL. Это позволяет:
- *   - отзывать отдельную сессию (logout с jti),
- *   - отзывать все сессии пользователя (logout all — удалить ключи по паттерну),
- *   - детектировать reuse украденного токена (отсутствие jti → compromise).
- */
+/** Хранилище refresh-токенов: ключ `refresh:{userId}:{jti}`, TTL = JWT_REFRESH_TTL. */
 export abstract class RefreshTokenStore {
   abstract save(userId: string, jti: string, tokenHash: string, ttlSeconds: number): Promise<void>;
   abstract exists(userId: string, jti: string, tokenHash: string): Promise<boolean>;

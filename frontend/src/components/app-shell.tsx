@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Users,
-  Inbox,
   GraduationCap,
   ClipboardCheck,
   BarChart3,
@@ -21,7 +20,7 @@ import {
   ShieldAlert,
   UsersRound,
   Search,
-  Settings,
+  LogOut,
   Menu,
   X,
   type LucideIcon,
@@ -32,6 +31,8 @@ import { clsx } from './clsx';
 import { JobsIndicator } from './background-jobs';
 import { ThemeToggle } from './theme-toggle';
 import { Logo } from './logo';
+import { StudentSidebar } from './student-sidebar';
+import { isStudentOnly } from '@/lib/role-helpers';
 
 type Section = 'admin' | 'academic' | 'teachers' | 'student';
 
@@ -46,33 +47,25 @@ interface NavItem {
 const ADMIN_ROLES: Role[] = ['SUPERADMIN', 'ADM', 'ADMINISTRATION'];
 
 const NAV: NavItem[] = [
-  // ── Администрация ──
   { href: '/admin/users', label: 'Пользователи', icon: Users, roles: ADMIN_ROLES, section: 'admin' },
   { href: '/admin/comment-options', label: 'Шаблоны комментариев', icon: MessagesSquare, roles: ADMIN_ROLES, section: 'admin' },
   { href: '/audit', label: 'Аудит', icon: ShieldAlert, roles: ['SUPERADMIN'], section: 'admin' },
 
-  // ── Учебная часть ──
-  // (TEA сюда не пускаем — у него собственный кабинет, см. ниже)
   { href: '/admissions', label: 'Абитуриент', icon: UserPlus, roles: ['SUPERADMIN', 'COM'], section: 'academic' },
   { href: '/dossier', label: 'Студенты', icon: GraduationCap, roles: [...ADMIN_ROLES, 'COM'], section: 'academic' },
   { href: '/certificates', label: 'Справки', icon: FileText, roles: [...ADMIN_ROLES, 'COM', 'STU'], section: 'academic' },
   { href: '/passes', label: 'Пропуска', icon: KeyRound, roles: [...ADMIN_ROLES, 'COM', 'STU'], section: 'academic' },
   { href: '/orders', label: 'Приказы', icon: ScrollText, roles: [...ADMIN_ROLES, 'COM'], section: 'academic' },
 
-  // ── Преподаватели ──
-  // Группа = досье + бенто-grid его студентов; журнал/расписание + ведомости-отчёты.
   { href: '/my-group', label: 'Моя группа', icon: UsersRound, roles: [...ADMIN_ROLES, 'TEA'], section: 'teachers' },
   { href: '/journal', label: 'Журнал', icon: BookOpen, roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
   { href: '/schedule', label: 'Расписание', icon: CalendarDays, roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
   { href: '/reports', label: 'Ведомости и отчёты', icon: BarChart3, roles: [...ADMIN_ROLES, 'COM', 'TEA'], section: 'teachers' },
 
-  // ── Личный кабинет ──
   { href: '/dashboard', label: 'Сводка', icon: Home, roles: [...ADMIN_ROLES, 'COM', 'TEA', 'STU'], section: 'student' },
-  { href: '/applications', label: 'Мои заявки', icon: Inbox, roles: [...ADMIN_ROLES, 'STU'], section: 'student' },
   { href: '/me', label: 'Мой профиль', icon: UserCircle, roles: [...ADMIN_ROLES, 'COM', 'TEA', 'STU'], section: 'student' },
 ];
 
-// «Кабинет» — общая личная зона (сводка/профиль). Раньше называлась «студент».
 const SECTION_LABELS: Record<Section, string> = {
   admin: 'администрация',
   academic: 'учебная часть',
@@ -85,6 +78,9 @@ const SECTION_ORDER: Section[] = ['admin', 'academic', 'teachers', 'student'];
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, hasRole } = useAuth();
   const pathname = usePathname();
+  if (isStudentOnly(user)) {
+    return <StudentShell>{children}</StudentShell>;
+  }
   const items = NAV.filter((n) => hasRole(n.roles));
 
   const initials = user ? `${user.lastName?.[0] ?? ''}${user.firstName?.[0] ?? ''}`.toUpperCase() : '';
@@ -100,9 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const q = query.trim().toLocaleLowerCase('ru');
   const isSearching = q.length > 0;
   const matches = (label: string) => label.toLocaleLowerCase('ru').includes(q);
-  // закрывать мобильное меню при навигации
   useEffect(() => { setMenuOpen(false); }, [pathname]);
-  // блокировать скролл фона, пока открыт оверлей
   useEffect(() => {
     if (menuOpen) {
       const prev = document.body.style.overflow;
@@ -115,7 +109,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className={clsx('app-shell', menuOpen && 'is-mobile-open')} style={{ display: 'flex', minHeight: '100vh', background: 'var(--ais-ink)', color: 'var(--ais-bone)' }}>
       <aside className={clsx('sidebar', menuOpen && 'is-mobile-open')}>
         <Link href="/" className="sidebar__brand" aria-label="АИС" style={{ padding: '4px 2px' }}>
-          {/* В сайдбаре wordmark поспокойнее — без мигания, средняя высота. */}
           <Logo height={52} />
         </Link>
 
@@ -183,13 +176,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Выход"
               title="Выход"
             >
-              <Settings size={16} strokeWidth={1.75} />
+              <LogOut size={16} strokeWidth={1.75} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* мобильный фон-оверлей */}
       <button
         type="button"
         className={clsx('sidebar-backdrop', menuOpen && 'is-visible')}
@@ -229,6 +221,58 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="app-main">
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function StudentShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (menuOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [menuOpen]);
+
+  return (
+    <div
+      className={clsx('app-shell', menuOpen && 'is-mobile-open')}
+      style={{ display: 'flex', minHeight: '100vh', background: 'var(--ais-ink)', color: 'var(--ais-bone)' }}
+    >
+      <StudentSidebar mobileOpen={menuOpen} />
+      <button
+        type="button"
+        className={clsx('sidebar-backdrop', menuOpen && 'is-visible')}
+        aria-label="Закрыть меню"
+        onClick={() => setMenuOpen(false)}
+      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <header
+          className="app-header"
+          style={{
+            position: 'sticky', top: 0, zIndex: 20, height: 56,
+            display: 'flex', alignItems: 'center', gap: 'var(--s-3)',
+            background: 'var(--ais-veil)', borderBottom: '1px solid var(--ais-line)',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <button
+            type="button"
+            className="menu-toggle btn btn--ghost btn--icon btn--sm"
+            aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? <X size={18} strokeWidth={1.75} /> : <Menu size={18} strokeWidth={1.75} />}
+          </button>
+          <div style={{ flex: 1 }} />
+          <JobsIndicator />
+          <ThemeToggle />
+        </header>
+        <main className="app-main">{children}</main>
       </div>
     </div>
   );

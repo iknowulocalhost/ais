@@ -27,16 +27,7 @@ export interface BatchEnrollOutcome {
   skipped: { id: string; reason: string }[];
 }
 
-/**
- * Массовое зачисление. Принимает список заявок в статусе ACCEPTED и группу.
- * Для каждой: создаёт Student со статусом ENROLLED, привязывает к группе,
- * переводит Application → ENROLLED. Ошибки по одной заявке не ломают пакет —
- * неудачные уходят в `skipped` с причиной.
- *
- * Транзакция НЕ открывается на весь пакет осознанно: частичный прогресс лучше,
- * чем полный откат из-за единичной плохой заявки. Каждая заявка обрабатывается
- * атомарно парой (create student → update application).
- */
+/** Массовое зачисление: ACCEPTED applications → ENROLLED + создание Student. Без общей транзакции. */
 @Injectable()
 export class BatchEnrollUseCase {
   constructor(

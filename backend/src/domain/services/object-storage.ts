@@ -1,7 +1,3 @@
-/**
- * Порт S3-совместимого файлового хранилища (MinIO).
- * Реализация — infrastructure/storage.
- */
 export interface PutObjectInput {
   bucket: string;
   key: string;
@@ -21,10 +17,8 @@ export abstract class ObjectStorage {
 
 export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
 
-/** Стандартные бакеты. */
 export const BUCKETS = {
   AVATARS: 'avatars',
   DOCUMENTS: 'documents',
-  /** Квитанции по заявкам на пропуск. Изолированы от студенческих доков. */
   PASSES: 'passes',
 } as const;

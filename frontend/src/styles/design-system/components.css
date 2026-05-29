@@ -1217,34 +1217,56 @@
 }
 
 
-/* ============================================ AUTH SPLIT LAYOUT ============================================ */
+/* ============================================
+   АИС:Студент — Сплит-авторизация (Адаптивная + Темы)
+   ============================================ */
 .auth-split {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1.05fr 1fr;
   background: var(--ais-paper);
+  color: var(--ais-bone);
 }
 
 .auth__brand {
   position: relative;
   overflow: hidden;
   background: var(--ais-ink);
-  color: var(--ais-bone);
   padding: var(--s-10);
-  /* Увеличенные отступы */
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: var(--s-7);
 }
 
+/* На десктопе тоже ограничиваем ширину логотипа — у нашего знака аспект ≈4.31,
+   поэтому Logo height={244} даёт ~1052px по ширине и вылезает за пределы
+   брендовой панели на средних мониторах. height становится auto, чтобы знак
+   масштабировался пропорционально, но не шире панели. */
+.auth__brand > header svg {
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 200px;
+}
+
+/* Контент бренд-панели должен лежать над фоновой grain-сеткой (::before). */
+.auth__brand > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Фоновая сетка наследует цвет текста (currentColor), 
+   поэтому корректно отображается и в тёмной, и в светлой теме */
 .auth__brand::before {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(244, 239, 229, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(244, 239, 229, 0.03) 1px, transparent 1px);
+    linear-gradient(currentColor 1px, transparent 1px),
+    linear-gradient(90deg, currentColor 1px, transparent 1px);
   background-size: 48px 48px;
+  opacity: 0.03;
   pointer-events: none;
 }
 
@@ -1262,14 +1284,27 @@
   position: relative;
   width: 100%;
   max-width: 420px;
-  /* Немного шире для крупных шрифтов */
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--s-8);
+  gap: var(--s-6);
   z-index: 10;
 }
 
+/* Управление шапкой формы */
+.auth-form__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Размеры полей ввода по умолчанию (десктоп) */
+.auth-form__input {
+  height: 56px;
+  font-size: var(--fs-16);
+}
+
+/* Декоративные скобки используют системную линию для смены цвета */
 .auth__brackets-bg {
   position: absolute;
   inset: 0;
@@ -1277,34 +1312,22 @@
   height: 100%;
   pointer-events: none;
   opacity: 0.3;
-  color: var(--ais-line);
+  color: var(--ais-line-2);
 }
 
+/* Плавное масштабирование заголовков */
 .hero__title {
   font-family: var(--ais-font-brand);
   font-weight: 800;
-  font-size: var(--fs-96);
-  /* Крупный шрифт */
-  line-height: 0.9;
-  letter-spacing: -0.05em;
+  font-size: clamp(36px, 6vw, var(--fs-96));
+  line-height: 0.95;
   margin: 0;
 }
 
-.hero__caret {
-  display: inline-block;
-  width: 0.15em;
-  height: 0.8em;
-  background: var(--ais-forest);
-  margin-left: 0.08em;
-  transform: translateY(0.05em);
-  /* Мигание убрано */
-}
-
 .hero__lede {
-  margin-top: var(--s-6);
+  margin-top: var(--s-8);
   max-width: 520px;
-  font-size: var(--fs-18);
-  /* Увеличенный текст описания */
+  font-size: var(--fs-16);
   line-height: 1.6;
   color: var(--ais-bone-2);
 }
@@ -1312,29 +1335,86 @@
 .form__title-large {
   font-family: var(--ais-font-display);
   font-weight: 700;
-  font-size: var(--fs-48);
-  /* Крупнее заголовок формы */
+  font-size: clamp(28px, 5vw, var(--fs-48));
   letter-spacing: -0.03em;
   line-height: 1;
   margin: 0;
   color: var(--ais-bone);
 }
 
+/* ===== АДАПТИВНОСТЬ (Планшеты и смартфоны) ===== */
 @media (max-width: 1024px) {
-  .hero__title {
-    font-size: var(--fs-64);
-  }
-
   .auth-split {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column-reverse;
+    min-height: 100vh;
   }
 
-  .auth__brand {
-    min-height: 50vh;
-    padding: var(--s-8);
-  }
-
+  /* 1. Добавляем безопасные боковые отступы (padding: 32px 24px), 
+     чтобы форма не прилипала к краям экрана и не наезжала на скобки */
   .auth__form {
-    padding: var(--s-8);
+    padding: var(--s-7) var(--s-6);
+    flex-grow: 1;
+  }
+
+  .auth-form-box {
+    max-width: 100%;
+  }
+
+  /* 2. Сдвигаем фоновые скобки чуть ближе к центру, 
+     чтобы они не перекрывались инпутами */
+  .auth__brackets-bg {
+    width: calc(100% - 16px);
+    margin: 0 auto;
+    left: 0;
+    right: 0;
+  }
+
+  /* Центрируем заголовки "АВТОРИЗАЦИЯ" и "Личный кабинет" */
+  .auth-form__head {
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Делаем поля ввода и кнопку чуть компактнее для телефонов */
+  .auth-form__input {
+    height: 48px;
+    font-size: var(--fs-14);
+  }
+
+  /* 3. Блок приветствия уходит вниз и оформляется как информационный футер */
+  .auth__brand {
+    padding: var(--s-8) var(--s-5);
+    gap: var(--s-5);
+    border-top: 1px solid var(--ais-line);
+    align-items: center;
+    text-align: center;
+  }
+
+  .auth__brand header {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .auth__brand header svg {
+    max-height: 64px !important;
+    max-width: 100%;
+    width: auto;
+  }
+
+  .auth__brand .hero__title {
+    display: none;
+  }
+
+  .auth__brand .hero__lede {
+    margin-top: 0;
+    font-size: 14px;
+  }
+
+  .auth__brand .meta {
+    width: 100%;
+    display: flex;
+    justify-content: center;
   }
 }

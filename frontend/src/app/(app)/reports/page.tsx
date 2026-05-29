@@ -24,6 +24,9 @@ export default function ReportsPage() {
   );
 }
 
+// Потолок опроса статуса экспорта: дальше polling прекращается.
+const POLL_MAX_MS = 5 * 60 * 1000;
+
 const STATUS_VARIANT: Record<ReportExport['status'], string> = {
   QUEUED: '',
   RUNNING: 'badge--warn',
@@ -44,12 +47,23 @@ function ReportsView() {
   const [error, setError] = useState<string | null>(null);
   const [queueing, setQueueing] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const pollStartRef = useRef<number>(0);
   const notified = useRef<Set<string>>(new Set());
   const jobs = useBackgroundJobs();
 
   const tick = useCallback(async () => {
     const pending = tracked.filter((r) => r.status === 'QUEUED' || r.status === 'RUNNING');
     if (pending.length === 0) return;
+    // Не опрашиваем, пока вкладка скрыта — не засоряем network в фоне.
+    if (typeof document !== 'undefined' && document.hidden) return;
+    // Потолок по времени: дальше polling прекращается, статус останется как есть.
+    if (pollStartRef.current && Date.now() - pollStartRef.current > POLL_MAX_MS) {
+      if (pollRef.current !== null) {
+        window.clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return;
+    }
     try {
       const updated = await Promise.all(
         pending.map((r) => apiFetch<ReportExport>(`/api/reports/exports/${r.id}`)),
@@ -84,6 +98,7 @@ function ReportsView() {
       return;
     }
     if (pollRef.current === null) {
+      pollStartRef.current = Date.now();
       pollRef.current = window.setInterval(() => void tick(), 2000);
     }
     return () => {

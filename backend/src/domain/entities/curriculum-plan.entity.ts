@@ -1,7 +1,3 @@
-/**
- * Учебный план. Один план привязан к коду программы и году набора.
- * Состоит из записей CurriculumEntry (дисциплина + семестр + форма контроля).
- */
 export type CurriculumPlanStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export class CurriculumPlan {

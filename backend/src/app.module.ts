@@ -22,7 +22,9 @@ import { CommentOptionsModule } from './presentation/http/comment-options.module
 import { LookupModule } from './presentation/http/lookup.module';
 import { PoozabeduApiModule } from './infrastructure/external/poozabeduapi/poozabeduapi.module';
 import { PoozabeduApiHttpModule } from './presentation/http/poozabeduapi.module';
+import { ChtotibModule } from './presentation/http/chtotib.module';
 import { AuditModule } from './presentation/http/audit.module';
+import { MaxIntegrationModule } from './presentation/http/modules/max-integration.module';
 import { ContextModule } from './infrastructure/context/context.module';
 import { NotificationsModule } from './infrastructure/notifications/notifications.module';
 import { BootstrapModule } from './infrastructure/bootstrap/bootstrap.module';
@@ -56,7 +58,9 @@ import { RolesGuard } from './presentation/http/auth/roles.guard';
     LookupModule,
     PoozabeduApiModule,
     PoozabeduApiHttpModule,
+    ChtotibModule,
     AuditModule,
+    MaxIntegrationModule,
     BootstrapModule,
   ],
   controllers: [HealthController],

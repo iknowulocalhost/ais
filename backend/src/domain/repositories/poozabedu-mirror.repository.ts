@@ -35,6 +35,12 @@ export abstract class PoozabeduStudentRepository {
     offset: number,
   ): Promise<{ items: PoozabeduStudent[]; total: number }>;
   abstract findByExternalId(externalId: number): Promise<PoozabeduStudent | null>;
+  /** Точный матч по ФИО (case-insensitive, пробелы trim). */
+  abstract findByFullName(
+    lastName: string,
+    firstName: string,
+    middleName: string | null,
+  ): Promise<PoozabeduStudent[]>;
 }
 
 export const POOZABEDU_DEPARTMENT_REPOSITORY = Symbol('POOZABEDU_DEPARTMENT_REPOSITORY');
