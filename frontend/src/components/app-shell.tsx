@@ -33,6 +33,7 @@ import { ThemeToggle } from './theme-toggle';
 import { Logo } from './logo';
 import { StudentSidebar } from './student-sidebar';
 import { isStudentOnly } from '@/lib/role-helpers';
+import { MaxLinkGate } from './max-link-gate';
 
 type Section = 'admin' | 'academic' | 'teachers' | 'student';
 
@@ -222,6 +223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <MaxLinkGate />
     </div>
   );
 }
@@ -274,6 +276,7 @@ function StudentShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="app-main">{children}</main>
       </div>
+      <MaxLinkGate />
     </div>
   );
 }

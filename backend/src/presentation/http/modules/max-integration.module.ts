@@ -8,6 +8,7 @@ import { MAX_LINK_TOKEN_REPOSITORY } from '../../../domain/repositories/max-link
 import { CreateMaxLinkTokenUseCase } from '../../../application/use-cases/max/create-max-link-token.use-case';
 import { LinkMaxAccountUseCase } from '../../../application/use-cases/max/link-max-account.use-case';
 import { UnlinkMaxAccountUseCase } from '../../../application/use-cases/max/unlink-max-account.use-case';
+import { SkipMaxPromptUseCase } from '../../../application/use-cases/max/skip-max-prompt.use-case';
 import { BotSharedSecretGuard } from '../auth/bot-shared-secret.guard';
 import { AuditService } from '../../../application/services/audit.service';
 
@@ -19,6 +20,7 @@ import { AuditService } from '../../../application/services/audit.service';
     CreateMaxLinkTokenUseCase,
     LinkMaxAccountUseCase,
     UnlinkMaxAccountUseCase,
+    SkipMaxPromptUseCase,
     BotSharedSecretGuard,
     AuditService,
   ],

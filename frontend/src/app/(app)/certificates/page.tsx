@@ -231,13 +231,13 @@ function CertificatesView() {
               <thead>
                 <tr>
                   <th>№</th>
-                  <th>ФИО</th>
+                  {!studentMode && <th>ФИО</th>}
                   <th>Группа</th>
                   <th>Тип</th>
                   <th>Куда</th>
                   <th>Статус</th>
                   <th>Комментарий</th>
-                  <th>Действия</th>
+                  <th>{studentMode ? '' : 'Действия'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,7 +248,7 @@ function CertificatesView() {
                   return (
                     <tr key={c.id}>
                       <td className="mono tnum">С-{c.displayNo}</td>
-                      <td><Link href={`/certificates/${c.id}`} className="link">{c.fullName}</Link></td>
+                      {!studentMode && <td><Link href={`/certificates/${c.id}`} className="link">{c.fullName}</Link></td>}
                       <td className="mono">{c.groupName}</td>
                       <td>{TYPE_LABELS[c.certType]}</td>
                       <td className="muted" style={{ fontSize: 'var(--fs-13)' }}>{c.targetOrg}</td>
@@ -259,18 +259,18 @@ function CertificatesView() {
                           <Link href={`/certificates/${c.id}`} className="btn btn--ghost btn--sm">
                             <Eye size={12} strokeWidth={1.75} /> Карточка
                           </Link>
-                          {c.status === 'APPROVED' && (
+                          {!studentMode && c.status === 'APPROVED' && (
                             <Link href={printHref} target="_blank" className="btn btn--ghost btn--sm">
                               <Printer size={12} strokeWidth={1.75} /> Печать
                             </Link>
                           )}
-                          {c.status !== 'APPROVED' && (
+                          {!studentMode && c.status !== 'APPROVED' && (
                             <button onClick={() => decide(c.id, 'APPROVE')} disabled={busy === c.id} className="btn btn--primary btn--sm">Выдать</button>
                           )}
-                          {c.status !== 'REJECTED' && (
+                          {!studentMode && c.status !== 'REJECTED' && (
                             <button onClick={() => decide(c.id, 'REJECT')} disabled={busy === c.id} className="btn btn--danger btn--sm">Отклонить</button>
                           )}
-                          {c.status !== 'PENDING' && (
+                          {!studentMode && c.status !== 'PENDING' && (
                             <button onClick={() => decide(c.id, 'RESET')} disabled={busy === c.id} className="btn btn--ghost btn--sm">В работу</button>
                           )}
                         </div>
@@ -332,9 +332,7 @@ function NewCertificateModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Студент заполняет заявку на себя — подтягиваем ФИО/группу/дату/контакты
-  // из своей учётки и карточки в зеркале Сетевого ПОО.
-  async function fillMyData() {
+  const fillMyData = useCallback(async () => {
     setError(null);
     try {
       const me = await apiFetch<{
@@ -355,7 +353,13 @@ function NewCertificateModal({
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось заполнить ваши данные');
     }
-  }
+  }, []);
+
+  // Студент → автозаполнение при открытии формы.
+  useEffect(() => {
+    if (studentMode && !fullName) void fillMyData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentMode]);
 
   // Если оператор подтянул карточку из Сетевого, по запросу подгрузим телефон —
   // у нас в зеркале телефонов нет, они только в детальном эндпоинте.
@@ -430,7 +434,7 @@ function NewCertificateModal({
         {studentMode ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={fillMyData}
                   style={{ alignSelf: 'flex-start' }}>
-            Заполнить моими данными
+            Себе
           </button>
         ) : (
           <div className="col" style={{ gap: 'var(--s-1)' }}>

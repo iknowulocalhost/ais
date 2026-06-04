@@ -62,7 +62,9 @@ export class CurriculumController {
     @Query('limit') limit = '50',
     @Query('offset') offset = '0',
   ) {
-    return this.disciplines.list({ search: q.search }, Number(limit), Number(offset));
+    const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const off = Math.max(Number(offset) || 0, 0);
+    return this.disciplines.list({ search: q.search }, lim, off);
   }
 
   @Roles(Role.ADM, Role.TEA, Role.ADMINISTRATION)
@@ -88,10 +90,12 @@ export class CurriculumController {
     @Query('limit') limit = '50',
     @Query('offset') offset = '0',
   ) {
+    const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const off = Math.max(Number(offset) || 0, 0);
     return this.plans.list(
       { programCode: q.programCode, admissionYear: q.admissionYear, status: q.status },
-      Number(limit),
-      Number(offset),
+      lim,
+      off,
     );
   }
 

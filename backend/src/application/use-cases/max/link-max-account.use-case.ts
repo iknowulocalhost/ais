@@ -65,6 +65,7 @@ export class LinkMaxAccountUseCase {
     }
 
     user.maxChatId = chatId;
+    user.maxLinkPromptSkipCount = 0; // сброс счётчика — privacy clean
     await this.users.update(user);
     await this.tokens.markUsed(token);
 

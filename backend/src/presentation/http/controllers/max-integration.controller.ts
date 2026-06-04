@@ -20,6 +20,7 @@ import { BotSharedSecretGuard } from '../auth/bot-shared-secret.guard';
 import { CreateMaxLinkTokenUseCase } from '../../../application/use-cases/max/create-max-link-token.use-case';
 import { LinkMaxAccountUseCase } from '../../../application/use-cases/max/link-max-account.use-case';
 import { UnlinkMaxAccountUseCase } from '../../../application/use-cases/max/unlink-max-account.use-case';
+import { SkipMaxPromptUseCase } from '../../../application/use-cases/max/skip-max-prompt.use-case';
 import {
   USER_REPOSITORY,
   UserRepository,
@@ -59,6 +60,7 @@ export class MaxIntegrationController {
     private readonly createTokenUC: CreateMaxLinkTokenUseCase,
     private readonly linkUC: LinkMaxAccountUseCase,
     private readonly unlinkUC: UnlinkMaxAccountUseCase,
+    private readonly skipUC: SkipMaxPromptUseCase,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -83,10 +85,20 @@ export class MaxIntegrationController {
   @Get('status')
   async status(@CurrentUser() user: AuthenticatedUser) {
     const u = await this.users.findById(user.id);
+    const skip = u?.maxLinkPromptSkipCount ?? 0;
     return {
-      // chat_id наружу не отдаём
       linked: !!u?.maxChatId,
+      skipCount: skip,
+      // ≥2 → фронт обязан показать блок-модалку без кнопки «Позже».
+      mustLink: !u?.maxChatId && skip >= 2,
     };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('skip-prompt')
+  @HttpCode(200)
+  async skipPrompt(@CurrentUser() user: AuthenticatedUser) {
+    return this.skipUC.execute(user.id);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -60,4 +60,7 @@ export class UserOrmEntity {
 
   @Column({ name: 'max_chat_id', type: 'varchar', length: 64, nullable: true })
   maxChatId!: string | null;
+
+  @Column({ name: 'max_link_prompt_skip_count', type: 'int', default: 0 })
+  maxLinkPromptSkipCount!: number;
 }

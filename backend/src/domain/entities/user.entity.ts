@@ -21,6 +21,8 @@ export class User {
     public samAccountName: string | null = null,
     /** chat_id в MAX — целевой адрес уведомлений, если задан. */
     public maxChatId: string | null = null,
+    /** Сколько раз пользователь закрыл prompt о привязке MAX. ≥2 → блокирующая модалка. */
+    public maxLinkPromptSkipCount: number = 0,
   ) {}
 
   hasRole(role: Role): boolean {

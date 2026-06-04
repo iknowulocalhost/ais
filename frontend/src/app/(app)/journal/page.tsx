@@ -411,8 +411,9 @@ function CellValue({ cell }: { cell: MarkCell }) {
     );
   }
   if (cell.absenceType) {
-    const label = ABSENCE_LABELS[cell.absenceType] ?? cell.absenceType.slice(0, 2);
-    return <span className="mono" style={{ color: 'var(--ais-ember)' }} title={cell.absenceType}>
+    const absStr = typeof cell.absenceType === 'string' ? cell.absenceType : String(cell.absenceType);
+    const label = ABSENCE_LABELS[absStr] ?? absStr.slice(0, 2);
+    return <span className="mono" style={{ color: 'var(--ais-ember)' }} title={absStr}>
       {label}
     </span>;
   }
@@ -421,7 +422,8 @@ function CellValue({ cell }: { cell: MarkCell }) {
 
 function fmt(iso: string | null | undefined): string {
   if (!iso) return '—';
-  const [y, m, d] = iso.slice(0, 10).split('-');
+  const s = typeof iso === 'string' ? iso : String(iso);
+  const [y, m, d] = s.slice(0, 10).split('-');
   return `${d}.${m}.${y}`;
 }
 
@@ -431,6 +433,6 @@ function lessonTypeShort(t: string | null | undefined): string {
     case 'PracticalWork': return 'пр';
     case 'PracticalTraining': return 'тр';
     case 'Examination': return 'экз';
-    default: return (t ?? '').slice(0, 3).toLowerCase();
+    default: return (typeof t === 'string' ? t : '').slice(0, 3).toLowerCase();
   }
 }

@@ -80,6 +80,7 @@ export class TypeOrmUserRepository implements UserRepository {
       r.studentExternalId,
       r.samAccountName,
       r.maxChatId,
+      r.maxLinkPromptSkipCount,
     );
   }
 
@@ -141,6 +142,7 @@ export class TypeOrmUserRepository implements UserRepository {
     row.studentExternalId = u.studentExternalId;
     row.samAccountName = u.samAccountName;
     row.maxChatId = u.maxChatId;
+    row.maxLinkPromptSkipCount = u.maxLinkPromptSkipCount;
     return row;
   }
 

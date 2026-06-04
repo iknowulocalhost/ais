@@ -238,20 +238,22 @@ function PassesView() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ФИО</th>
+                  {!studentMode && <th>ФИО</th>}
                   <th>Группа / должность</th>
                   <th>Общежитие</th>
                   <th>Статус</th>
                   <th>Комментарий</th>
-                  <th>Действия</th>
+                  <th>{studentMode ? '' : 'Действия'}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((p) => (
                   <tr key={p.id}>
-                    <td>
-                      <Link href={`/passes/${p.id}`} className="link">{p.fullName}</Link>
-                    </td>
+                    {!studentMode && (
+                      <td>
+                        <Link href={`/passes/${p.id}`} className="link">{p.fullName}</Link>
+                      </td>
+                    )}
                     <td className="mono">{p.groupOrPosition}</td>
                     <td>{HOSTEL_LABELS[p.hostel]}</td>
                     <td><span className={`badge ${STATUS_VARIANT[p.status]}`}>{STATUS_LABELS[p.status]}</span></td>
@@ -266,17 +268,17 @@ function PassesView() {
                             Квитанция
                           </button>
                         )}
-                        {p.status !== 'APPROVED' && (
+                        {!studentMode && p.status !== 'APPROVED' && (
                           <button onClick={() => decide(p.id, 'APPROVE')} disabled={busy === p.id} className="btn btn--primary btn--sm">
                             Выдать
                           </button>
                         )}
-                        {p.status !== 'REJECTED' && (
+                        {!studentMode && p.status !== 'REJECTED' && (
                           <button onClick={() => decide(p.id, 'REJECT')} disabled={busy === p.id} className="btn btn--danger btn--sm">
                             Отклонить
                           </button>
                         )}
-                        {p.status !== 'PENDING' && (
+                        {!studentMode && p.status !== 'PENDING' && (
                           <button onClick={() => decide(p.id, 'RESET')} disabled={busy === p.id} className="btn btn--ghost btn--sm">
                             В работу
                           </button>
@@ -340,8 +342,7 @@ function NewPassModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Студент оформляет пропуск себе — подтягиваем ФИО и группу из своей учётки.
-  async function fillMyData() {
+  const fillMyData = useCallback(async () => {
     setError(null);
     try {
       const me = await apiFetch<{
@@ -358,7 +359,12 @@ function NewPassModal({
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось заполнить ваши данные');
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (studentMode && !fullName) void fillMyData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentMode]);
 
   function onPickStudent(s: PickedStudent | null) {
     setStudent(s);
@@ -428,7 +434,7 @@ function NewPassModal({
         {studentMode ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={fillMyData}
                   style={{ alignSelf: 'flex-start' }}>
-            Заполнить моими данными
+            Себе
           </button>
         ) : (
           <>
