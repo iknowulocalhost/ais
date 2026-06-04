@@ -1,4 +1,16 @@
 import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import {
   Body,
   Controller,
   Delete,
@@ -6,12 +18,12 @@ import {
   HttpCode,
   Ip,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Public } from '../auth/public.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -25,6 +37,10 @@ import {
   USER_REPOSITORY,
   UserRepository,
 } from '../../../domain/repositories/user.repository';
+import {
+  MAX_OUTBOX_REPOSITORY,
+  MaxOutboxRepository,
+} from '../../../domain/repositories/max-outbox.repository';
 import { Inject } from '@nestjs/common';
 import { AuditContext } from '../../../application/services/audit.service';
 
@@ -45,6 +61,18 @@ class LinkMaxDto {
   maxFio?: string;
 }
 
+class OutboxQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) afterId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
+}
+
+class OutboxAckDto {
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  ids!: string[];
+}
+
 function buildCtx(req: Request, ip: string, actorId: string | null): AuditContext {
   return {
     actorId,
@@ -61,6 +89,7 @@ export class MaxIntegrationController {
     private readonly linkUC: LinkMaxAccountUseCase,
     private readonly unlinkUC: UnlinkMaxAccountUseCase,
     private readonly skipUC: SkipMaxPromptUseCase,
+    @Inject(MAX_OUTBOX_REPOSITORY) private readonly outbox: MaxOutboxRepository,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -126,5 +155,34 @@ export class MaxIntegrationController {
     // actorId=null: инициатор — бот
     const ctx = buildCtx(req, ip, null);
     return this.linkUC.execute(dto.token, dto.maxChatId, dto.maxFio ?? null, ctx);
+  }
+
+  // ─── Polling-API для бота ───
+  // GET ?afterId=N&limit=50 → недоставленные сообщения с id > afterId.
+  @Public()
+  @UseGuards(BotSharedSecretGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('outbox')
+  async outboxList(@Query() q: OutboxQueryDto) {
+    const items = await this.outbox.fetchPending(String(q.afterId ?? 0), q.limit ?? 50);
+    return {
+      items: items.map((i) => ({
+        id: i.id,
+        maxChatId: i.maxChatId,
+        text: i.text,
+        createdAt: i.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  // POST {ids: [...]} → пометить отправленные доставленными.
+  @Public()
+  @UseGuards(BotSharedSecretGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Post('outbox/ack')
+  @HttpCode(200)
+  async outboxAck(@Body() dto: OutboxAckDto) {
+    const n = await this.outbox.markDelivered(dto.ids);
+    return { acked: n };
   }
 }

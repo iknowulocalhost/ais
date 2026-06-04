@@ -8,12 +8,6 @@ version: "3.9"
 networks:
   ais_net:
     driver: bridge
-  # Общая внешняя сеть для связи с другими проектами колледжа
-  # (dashboard.chtotib.ru + alertbot). Создать один раз вручную на хосте:
-  #   docker network create chtotib_shared
-  # Без неё бэк не сможет дотянуться до MAX-бота (`dashboard-alert-maxbot`).
-  chtotib_shared:
-    external: true
 
 volumes:
   pg_data:
@@ -167,13 +161,6 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     networks:
       - ais_net
-      - chtotib_shared
-    # Явный DNS: при подключении контейнера к двум bridge-сетям Docker Desktop
-    # иногда отдаёт сломанный embedded-резолвер (100::1 на любое имя),
-    # ломая outbound к poo.zabedu.ru / chtotib.ru. Cloudflare + Google перекрывают это.
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
 
   # ----------------------------------------------------------------------
   # Frontend — Next.js.
