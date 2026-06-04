@@ -84,23 +84,32 @@ export function MaxIntegrationPanel() {
       )}
 
       {pending && (
-        <div className="callout" style={{ marginBottom: 'var(--s-3)', padding: 'var(--s-3)' }}>
-          <strong>Откройте бота в МАХ.</strong>{' '}
-          {pending.deepLink ? (
-            <>
-              Если новая вкладка не открылась — нажмите{' '}
-              <a href={pending.deepLink} target="_blank" rel="noopener noreferrer">эту ссылку</a>.
-            </>
-          ) : (
-            <>
-              Найдите бота вручную и пришлите ему сообщение:{' '}
-              <code className="mono">/start link_{pending.token}</code>
-            </>
-          )}
-          <br />
-          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>
+        <div
+          className="callout"
+          style={{
+            display: 'block',
+            marginBottom: 'var(--s-3)',
+            padding: 'var(--s-4)',
+            lineHeight: 1.55,
+          }}
+        >
+          <p style={{ margin: 0 }}>
+            <strong>Откройте бота в МАХ.</strong>{' '}
+            {pending.deepLink ? (
+              <>
+                Если новая вкладка не открылась — нажмите{' '}
+                <a href={pending.deepLink} target="_blank" rel="noopener noreferrer">эту ссылку</a>.
+              </>
+            ) : (
+              <>
+                Найдите бота вручную и пришлите ему сообщение:{' '}
+                <code className="mono">/start link_{pending.token}</code>.
+              </>
+            )}
+          </p>
+          <p className="muted" style={{ margin: 'var(--s-2) 0 0', fontSize: 'var(--fs-12)' }}>
             Ссылка действует 10 минут. После подтверждения в МАХ — обновите страницу.
-          </span>
+          </p>
           <div style={{ marginTop: 'var(--s-3)' }}>
             <button type="button" className="btn btn--ghost" onClick={refresh} disabled={busy}>
               Проверить статус
