@@ -3,16 +3,7 @@ import { PoozabeduApiClient } from '../../../infrastructure/external/poozabeduap
 import { AuditService } from '../../services/audit.service';
 import { RequestContext } from '../../../infrastructure/context/request-context';
 
-/**
- * Прокси к /services/reports/* у Сетевого ПОО. Тип возвращаемых данных
- * варьируется (десятки разных отчётов), поэтому здесь — `unknown`. UI на фронте
- * рендерит то, что прислали. Каждый запрос аудитируется как чтение чувствительных
- * данных (отчёты включают ФИО, группы, академические показатели).
- *
- * Защита от SSRF: путь должен начинаться с латинских букв и состоять только из
- * допустимых символов (буквы, цифры, дефис, слэш, точка для дат). Никаких `..`
- * и абсолютных URL.
- */
+/** Прокси к /services/reports/*. SSRF-валидация пути + READ_SENSITIVE в аудит. */
 @Injectable()
 export class GetReportUseCase {
   constructor(

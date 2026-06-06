@@ -9,6 +9,7 @@ import {
 } from '../../../domain/services/password-hasher';
 import { PasswordGenerator } from '../../services/password-generator';
 import { AuditService } from '../../services/audit.service';
+import { NotifyService } from '../../services/notify.service';
 import { RequestContext } from '../../../infrastructure/context/request-context';
 
 /**
@@ -25,6 +26,7 @@ export class ResetPasswordUseCase {
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly generator: PasswordGenerator,
     private readonly audit: AuditService,
+    private readonly notify: NotifyService,
     private readonly reqCtx: RequestContext,
   ) {}
 
@@ -45,6 +47,18 @@ export class ResetPasswordUseCase {
       entity: 'User',
       entityId: user.id,
       newState: { byActor: ctx.actorId, at: user.updatedAt },
+    });
+
+    // Пароль в MAX НЕ шлём (канал записывается в audit_log + БД outbox).
+    // Только факт сброса — пусть пользователь спросит у админа лично.
+    await this.notify.enqueue({
+      userId: user.id,
+      to: user.email,
+      subject: 'Пароль АИС сброшен',
+      text:
+        'Администратор сбросил ваш пароль в АИС. ' +
+        'Новый пароль выдан вам отдельно — устно или в распечатке. ' +
+        'Если вы пароль не получали — обратитесь к администратору.',
     });
 
     return { password, email: user.email };

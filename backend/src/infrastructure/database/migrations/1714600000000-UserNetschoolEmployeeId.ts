@@ -1,16 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Привязка пользователя АИС к сотруднику в Сетевом ПОО (poo.zabedu.ru).
- *
- * Используется для RBAC роли TEA (классный руководитель): по этому полю
- * сопоставляем `users.id` ↔ `poozabedu_student_group.curator_external_id`,
- * чтобы определить «свои» группы и допустить просмотр только их журналов
- * и студентов.
- *
- * Заполняется явно администратором при выдаче TEA-роли. Без проставленного
- * значения TEA не сможет посмотреть ни одну группу — fail-closed.
- */
+/** users.netschool_employee_id: id сотрудника Сетевого ПОО (для RBAC TEA). */
 export class UserNetschoolEmployeeId1714600000000 implements MigrationInterface {
   name = 'UserNetschoolEmployeeId1714600000000';
 

@@ -29,7 +29,7 @@ export default function LoginPage() {
       router.replace(homePathForRoles(u.roles));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError('Неверный email или пароль.');
+        setError('Неверный логин или пароль.');
       } else {
         setError('Ошибка входа. Проверьте подключение к сети.');
       }
@@ -84,12 +84,13 @@ export default function LoginPage() {
             <div className="field">
               <span className="field__label mono" style={{ fontSize: '11px' }}>ЛОГИН</span>
               <input
-                className="input auth-form__input"
+                className="input"
+                style={{ height: '56px', fontSize: '16px' }}
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@chtotib.ru"
+                placeholder="name@tti.ru"
               />
             </div>
 

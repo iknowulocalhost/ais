@@ -32,6 +32,7 @@ import { SetUserRolesUseCase } from '../../../application/use-cases/users/set-us
 import { ResetPasswordUseCase } from '../../../application/use-cases/users/reset-password.use-case';
 import { EnsureStudentAccountUseCase } from '../../../application/use-cases/users/ensure-student-account.use-case';
 import { BulkEnsureGroupAccountsUseCase } from '../../../application/use-cases/users/bulk-ensure-group-accounts.use-case';
+import { SetUserStudentExternalIdUseCase } from '../../../application/use-cases/users/set-student-external-id.use-case';
 import { ParseIntPipe } from '@nestjs/common';
 import { AuditContext } from '../../../application/services/audit.service';
 import { Roles } from '../auth/roles.decorator';
@@ -56,6 +57,14 @@ class SetNetschoolEmployeeDto {
   netschoolEmployeeId!: number | null;
 }
 
+class SetStudentExternalIdDto {
+  @ValidateIf((o: SetStudentExternalIdDto) => o.studentExternalId !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  studentExternalId!: number | null;
+}
+
 class SetUserRolesDto {
   @IsArray()
   @ArrayNotEmpty()
@@ -73,6 +82,7 @@ export class UsersController {
     private readonly resetPasswordUc: ResetPasswordUseCase,
     private readonly ensureStudentAccountUc: EnsureStudentAccountUseCase,
     private readonly bulkEnsureGroupAccountsUc: BulkEnsureGroupAccountsUseCase,
+    private readonly setStudentExternalIdUc: SetUserStudentExternalIdUseCase,
     @Inject(USER_REPOSITORY) private readonly users: UserRepository,
     @Inject(AUDIT_LOG_REPOSITORY) private readonly auditLogs: AuditLogRepository,
   ) {}
@@ -105,10 +115,6 @@ export class UsersController {
     return this.serialize(user);
   }
 
-  /**
-   * Актуальный профиль для UI. JWT содержит только id/email/roles;
-   * ФИО и активность подтягиваем из БД — это одна точечная выборка по индексу.
-   */
   @Get('me')
   async me(@CurrentUser() actor: AuthenticatedUser) {
     const u = await this.users.findById(actor.id);
@@ -118,14 +124,25 @@ export class UsersController {
 
   @Roles(Role.ADM, Role.SUPERADMIN, Role.ADMINISTRATION)
   @Get()
-  async list(@Query('limit') limit = '50', @Query('offset') offset = '0') {
+  async list(
+    @Query('limit') limit = '50',
+    @Query('offset') offset = '0',
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+  ) {
     const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
     const off = Math.max(Number(offset) || 0, 0);
-    const { items, total } = await this.users.list(lim, off);
+    const safeRole = role && (Object.values(Role) as string[]).includes(role)
+      ? (role as Role) : undefined;
+    const safeSearch = typeof search === 'string' && search.trim().length >= 2
+      ? search.trim() : undefined;
+    const { items, total } = await this.users.list(lim, off, {
+      search: safeSearch,
+      role: safeRole,
+    });
     return { total, items: items.map((u) => this.serialize(u)) };
   }
 
-  /** Карточка пользователя — для админ-формы. */
   @Roles(Role.ADM, Role.SUPERADMIN)
   @Get(':id')
   async getOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -134,11 +151,6 @@ export class UsersController {
     return this.serialize(u);
   }
 
-  /**
-   * Привязка пользователя АИС к сотруднику Сетевого ПОО.
-   * Используется для выдачи TEA-доступа к его группам.
-   * Передать `null` — снять привязку.
-   */
   @Roles(Role.ADM, Role.SUPERADMIN)
   @Patch(':id/netschool-employee')
   async patchNetschoolEmployee(
@@ -148,11 +160,15 @@ export class UsersController {
     return this.setNetschoolEmployee.execute(id, dto.netschoolEmployeeId);
   }
 
-  /**
-   * Изменить набор ролей пользователя. После сохранения — перелогин (роли в JWT).
-   * Подъём до SUPERADMIN — только из-под действующего SUPERADMIN; снятие SUPERADMIN
-   * с самого себя запрещено.
-   */
+  @Roles(Role.ADM, Role.SUPERADMIN, Role.COM)
+  @Patch(':id/student-external-id')
+  async patchStudentExternalId(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetStudentExternalIdDto,
+  ) {
+    return this.setStudentExternalIdUc.execute(id, dto.studentExternalId);
+  }
+
   @Roles(Role.ADM, Role.SUPERADMIN)
   @Patch(':id/roles')
   async patchRoles(
@@ -163,10 +179,7 @@ export class UsersController {
     return this.setUserRoles.execute(id, dto.roles, { id: actor.id, roles: actor.roles });
   }
 
-  /**
-   * Сброс пароля пользователю. Возвращает новый plaintext-пароль ровно один раз —
-   * админ показывает/печатает его и сохраняет (мы хеш не храним в обратимом виде).
-   */
+  /** Возвращает plaintext один раз. */
   @Roles(Role.ADM, Role.SUPERADMIN)
   @Post(':id/reset-password')
   @HttpCode(200)
@@ -174,11 +187,7 @@ export class UsersController {
     return this.resetPasswordUc.execute(id);
   }
 
-  /**
-   * Создать (или вернуть существующий) студенческий аккаунт по external_id из
-   * зеркала Сетевого ПОО. Идемпотентно: если уже создавали — вернёт ту же
-   * учётку, но без пароля. Свежесозданному выдаём plaintext-пароль один раз.
-   */
+  /** Идемпотентно; новому — plaintext один раз. */
   @Roles(Role.ADM, Role.SUPERADMIN, Role.COM)
   @Post('students/:externalId/account')
   @HttpCode(200)
@@ -188,7 +197,6 @@ export class UsersController {
     return this.ensureStudentAccountUc.execute(externalId);
   }
 
-  /** Найти учётку, привязанную к студенту из зеркала. 404 если ещё не создана. */
   @Roles(Role.ADM, Role.SUPERADMIN, Role.COM)
   @Get('students/:externalId/account')
   async getStudentAccount(
@@ -199,11 +207,6 @@ export class UsersController {
     return this.serialize(u);
   }
 
-  /**
-   * История смен пароля по аккаунту. Берём из `audit_log` записи с
-   * `entity='User'`, `action='PASSWORD_CHANGE'` для нужного userId — там же
-   * сохраняется кто именно сбросил пароль (`actorId`).
-   */
   @Roles(Role.ADM, Role.SUPERADMIN, Role.COM)
   @Get(':id/password-history')
   async passwordHistory(@Param('id', ParseUUIDPipe) id: string) {
@@ -211,8 +214,6 @@ export class UsersController {
     if (!u) throw new NotFoundException();
     const logs = await this.auditLogs.findByEntity('User', id, 50);
     const passwordEvents = logs.filter((l) => l.action === 'PASSWORD_CHANGE');
-    // Подсасываем ФИО актёров за один проход — чтобы фронт сразу нарисовал
-    // «сбросил Иванов И.И.», без второго запроса.
     const actorIds = [...new Set(passwordEvents.map((e) => e.actorId).filter((x): x is string => !!x))];
     const actorNameById = new Map<string, string>();
     for (const aid of actorIds) {

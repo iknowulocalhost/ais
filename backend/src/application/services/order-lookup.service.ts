@@ -3,22 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Поиск данных о студенте по ФИО в исторических CSV-выгрузках техникума.
- * Перенесено из dashboard.chtotib.ru/core/services/order_lookup.py.
- *
- * Скоп MVP:
- *  - читаем `order.csv` (UTF-8, ; как разделитель) — приказ о зачислении студента;
- *  - находим строку по маске «Фамилия И. О.»;
- *  - определяем каноническую специальность по полю «Специальность» или префиксу группы;
- *  - считаем текущий курс и год выпуска по дате приказа + длительности обучения.
- *
- * Намеренно не перенесено:
- *  - дательный падеж ФИО (pymorphy2) — печатные формы используют nominative как fallback;
- *  - order_perem.csv (академические отпуска) — отдельная фича для общей справки,
- *    оставлена на «потом».
- */
-
 export interface SpecialtyMeta {
   code: string | null;
   durationMonths: number;
@@ -236,7 +220,6 @@ export interface OrderLookupResult {
   } | null;
   course?: number | null;
   gradYear?: number | null;
-  /** Академические отпуска. Каждый сдвигает год выпуска на +1 учебный год. */
   academicPeriods?: AcademicPeriod[];
 }
 
@@ -245,7 +228,6 @@ export class OrderLookupService implements OnModuleInit {
   private readonly logger = new Logger(OrderLookupService.name);
   private rows: OrderRow[] = [];
   private byMask = new Map<string, OrderRow>();
-  /** order_perem.csv: ФИО (полное) → массив строк (один студент может иметь несколько приказов). */
   private peremByFullName = new Map<string, PeremRow[]>();
 
   constructor(private readonly cfg: ConfigService) {}
@@ -254,7 +236,6 @@ export class OrderLookupService implements OnModuleInit {
     const dataDir = this.cfg.get<string>('CSV_DATA_DIR') ||
       path.resolve(process.cwd(), 'data');
 
-    // order.csv — приказы о зачислении
     try {
       const text = await fs.promises.readFile(path.join(dataDir, 'order.csv'), 'utf8');
       this.rows = parseOrderCsv(text);
@@ -268,7 +249,6 @@ export class OrderLookupService implements OnModuleInit {
       );
     }
 
-    // order_perem.csv — приказы о переменах (нас интересуют академические отпуска)
     try {
       const text = await fs.promises.readFile(path.join(dataDir, 'order_perem.csv'), 'utf8');
       const perem = parsePeremCsv(text);
@@ -286,11 +266,6 @@ export class OrderLookupService implements OnModuleInit {
     }
   }
 
-  /**
-   * Поиск студента по «Фамилия Имя Отчество» (ищем по маске «Фамилия И. О.»).
-   * Возвращает агрегированный результат: специальность, курс, год выпуска,
-   * список академических отпусков. Каждый академ сдвигает год выпуска на +1.
-   */
   lookupByFullName(fullName: string, today: Date = new Date()): OrderLookupResult {
     const mask = fioToMask(fullName);
     if (!mask) return { found: false };
@@ -302,7 +277,6 @@ export class OrderLookupService implements OnModuleInit {
     const canon = detectCanonicalSpecialty(row);
     const meta = canon ? SPECIALTY_CANON[canon] : null;
 
-    // Академы — берём из order_perem.csv по полному ФИО (нормализуем пробелы).
     const peremRows = this.peremByFullName.get(normalizeFio(fullName)) ?? [];
     const academicPeriods = extractAcademicPeriods(peremRows);
 
@@ -316,7 +290,6 @@ export class OrderLookupService implements OnModuleInit {
       if (c < 1) c = 1;
       if (c > totalYears) c = totalYears;
       course = c;
-      // Каждый академ сдвигает выпуск на +1 учебный год — как в Django.
       gradYear = startAcYear + totalYears + academicPeriods.length;
     }
 
@@ -342,7 +315,6 @@ export class OrderLookupService implements OnModuleInit {
 /* ───── parsing helpers ───── */
 
 function parseOrderCsv(text: string): OrderRow[] {
-  // Простой парсер без поддержки экранирования (в данных нет ни кавычек, ни ; внутри полей).
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
   if (lines.length === 0) return [];
   const headerCells = splitLine(lines[0]);
@@ -371,7 +343,6 @@ function parseOrderCsv(text: string): OrderRow[] {
 }
 
 function splitLine(line: string): string[] {
-  // CSV с разделителем ;, без кавычек. Хвостовая ; даёт лишний пустой элемент — терпим.
   return line.split(';').map((s) => s);
 }
 
@@ -406,10 +377,6 @@ function normalizeFio(s: string): string {
   return (s || '').replace(/\xa0/g, ' ').split(/\s+/).filter(Boolean).join(' ');
 }
 
-/**
- * Из строк order_perem.csv извлекаем периоды академических отпусков.
- * Логика повторяет dashboard.chtotib.ru/core/services/order_lookup.py::extract_academic_periods.
- */
 function extractAcademicPeriods(rows: PeremRow[]): AcademicPeriod[] {
   const out: AcademicPeriod[] = [];
   for (const row of rows) {
@@ -472,7 +439,6 @@ export function parseShortDate(value: string | null | undefined): Date | null {
 }
 
 function academicStartYear(d: Date): number {
-  // Учебный год начинается с августа.
   return d.getMonth() + 1 >= 8 ? d.getFullYear() : d.getFullYear() - 1;
 }
 

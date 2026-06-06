@@ -7,6 +7,8 @@ import { ArrowLeft, Printer, Pencil, RotateCcw, Check, X } from 'lucide-react';
 import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
+import { useAuth } from '@/lib/auth-context';
+import { isStudentOnly } from '@/lib/role-helpers';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 type CertType = 'STUDY' | 'SCHOLARSHIP' | 'INCOME' | 'TAX' | 'MILITARY';
@@ -51,6 +53,8 @@ export default function CertificateDetailPage() {
 function CertificateDetail() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const studentMode = isStudentOnly(user);
   const id = params?.id;
   const [cert, setCert] = useState<Cert | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -187,18 +191,18 @@ function CertificateDetail() {
       </div>
 
       <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
-        {cert.status === 'APPROVED' && (
+        {!studentMode && cert.status === 'APPROVED' && (
           <Link href={printHref} target="_blank" className="btn btn--ghost">
             <Printer size={14} strokeWidth={1.75} /> Печать
           </Link>
         )}
-        {cert.status !== 'APPROVED' && (
+        {!studentMode && cert.status !== 'APPROVED' && (
           <button onClick={() => decide('APPROVE')} disabled={busy} className="btn btn--primary">Выдать</button>
         )}
-        {cert.status !== 'REJECTED' && (
+        {!studentMode && cert.status !== 'REJECTED' && (
           <button onClick={() => decide('REJECT')} disabled={busy} className="btn btn--danger">Отклонить</button>
         )}
-        {cert.status !== 'PENDING' && (
+        {!studentMode && cert.status !== 'PENDING' && (
           <button onClick={() => decide('RESET')} disabled={busy} className="btn btn--ghost">Вернуть в работу</button>
         )}
         <Link href="/certificates" className="btn btn--ghost" style={{ marginLeft: 'auto' }}>К списку</Link>

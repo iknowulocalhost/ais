@@ -19,25 +19,14 @@ import { User } from '../../../domain/entities/user.entity';
 import { Role } from '../../../domain/enums/role.enum';
 
 export interface EnsureStudentAccountResult {
-  /** Если `true` — это новая учётка, и `password` свежесозданный (показываем). */
   created: boolean;
   userId: string;
   email: string;
-  /** Plaintext-пароль возвращается ровно один раз — только для свежесозданных. */
+  /** Plaintext, только для свежесозданной учётки. */
   password: string | null;
 }
 
-/**
- * Создаёт пользовательскую учётку для студента из зеркала Сетевого ПОО,
- * если её ещё нет. Идемпотентна: повторный вызов вернёт ту же учётку без
- * нового пароля.
- *
- * Логин формируется в виде `<lastname>.<firstname>@chtotib.ru`
- * (транслитерация по ГОСТ, в нижнем регистре). Если такой логин уже занят
- * (полный однофамилец), добавляем суффикс `.<external_id>` — это гарантирует
- * уникальность и сохраняет осмысленность. Реальная почта студента, если она
- * появится, прописывается отдельно через профиль.
- */
+/** Создаёт STU-учётку из зеркала студента (идемпотентно). Email: lastname.firstname@chtotib.ru. */
 @Injectable()
 export class EnsureStudentAccountUseCase {
   constructor(

@@ -6,6 +6,7 @@ import { SetUserRolesUseCase } from '../../application/use-cases/users/set-user-
 import { ResetPasswordUseCase } from '../../application/use-cases/users/reset-password.use-case';
 import { EnsureStudentAccountUseCase } from '../../application/use-cases/users/ensure-student-account.use-case';
 import { BulkEnsureGroupAccountsUseCase } from '../../application/use-cases/users/bulk-ensure-group-accounts.use-case';
+import { SetUserStudentExternalIdUseCase } from '../../application/use-cases/users/set-student-external-id.use-case';
 import { PasswordGenerator } from '../../application/services/password-generator';
 import { AuditService } from '../../application/services/audit.service';
 
@@ -18,6 +19,7 @@ import { AuditService } from '../../application/services/audit.service';
     ResetPasswordUseCase,
     EnsureStudentAccountUseCase,
     BulkEnsureGroupAccountsUseCase,
+    SetUserStudentExternalIdUseCase,
     PasswordGenerator,
     AuditService,
   ],

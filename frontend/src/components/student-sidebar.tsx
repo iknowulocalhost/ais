@@ -6,12 +6,11 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Calendar,
-  Bell,
+  BookOpen,
   FileText,
-  FileX,
-  MessageSquare,
+  KeyRound,
   Search,
-  Settings,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
@@ -23,27 +22,26 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   count?: number;
-  section: 'main' | 'docs' | 'comm';
+  section: 'main' | 'academic' | 'docs';
 }
 
-// TODO: подменить count на данные с бэка (нет эндпоинтов на момент верстки).
-// «Успеваемость» и «Учебный план» убраны: соответствующие /api/grades и
-// /api/curriculum требуют ролей ADM/TEA/ANA — студенту 403.
+// Только реальные страницы: /notifications, /absences, /messages не существуют —
+// убрал, чтобы у студента не было «битых» ссылок. Журнал и расписание
+// доступны студенту — он видит свою группу через `studentExternalId → groupName`.
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Сводка', icon: Home, section: 'main' },
-  { href: '/schedule', label: 'Расписание', icon: Calendar, section: 'main' },
-  { href: '/notifications', label: 'Уведомления', icon: Bell, count: 3, section: 'main' },
+
+  { href: '/schedule', label: 'Расписание', icon: Calendar, section: 'academic' },
+  { href: '/journal', label: 'Электронный журнал', icon: BookOpen, section: 'academic' },
 
   { href: '/certificates', label: 'Справки', icon: FileText, section: 'docs' },
-  { href: '/absences', label: 'Пропуски', icon: FileX, section: 'docs' },
-
-  { href: '/messages', label: 'Сообщения', icon: MessageSquare, section: 'comm' },
+  { href: '/passes', label: 'Пропуска', icon: KeyRound, section: 'docs' },
 ];
 
 const SECTION_LABELS: Record<NavItem['section'], string> = {
   main: 'главное',
+  academic: 'учебный процесс',
   docs: 'документы',
-  comm: 'общение',
 };
 
 export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
@@ -62,7 +60,7 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
   const group = 'ПМ-221';
   const course = '2 курс';
 
-  const bySection = (['main', 'docs', 'comm'] as const).map((s) => ({
+  const bySection = (['main', 'academic', 'docs'] as const).map((s) => ({
     key: s,
     label: SECTION_LABELS[s],
     items: NAV.filter((i) => i.section === s),
@@ -143,10 +141,10 @@ export function StudentSidebar({ mobileOpen = false }: { mobileOpen?: boolean })
             type="button"
             onClick={() => void logout()}
             className="btn btn--ghost btn--icon btn--sm"
-            aria-label="Настройки и выход"
-            title="Выход"
+            aria-label="Выйти из АИС"
+            title="Выйти"
           >
-            <Settings size={16} strokeWidth={1.75} />
+            <LogOut size={16} strokeWidth={1.75} />
           </button>
         </div>
       </div>

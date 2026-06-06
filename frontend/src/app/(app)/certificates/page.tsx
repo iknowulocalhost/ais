@@ -8,6 +8,8 @@ import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
 import { StudentPicker, type PickedStudent } from '@/components/student-picker';
+import { useAuth } from '@/lib/auth-context';
+import { isStudentOnly } from '@/lib/role-helpers';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 type CertType = 'STUDY' | 'SCHOLARSHIP' | 'INCOME' | 'TAX' | 'MILITARY';
@@ -67,6 +69,8 @@ export default function CertificatesPage() {
 }
 
 function CertificatesView() {
+  const { user } = useAuth();
+  const studentMode = isStudentOnly(user);
   const [filter, setFilter] = useState<Status | ''>('');
   const [typeFilter, setTypeFilter] = useState<CertType | ''>('');
   const [search, setSearch] = useState('');
@@ -172,35 +176,39 @@ function CertificatesView() {
       <header className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--s-3)' }}>
         <div className="col" style={{ gap: 'var(--s-2)' }}>
           <div className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-            учебная часть
+            {studentMode ? 'мои заявки' : 'учебная часть'}
           </div>
           <h1 className="display" style={{ fontSize: 'clamp(28px, 3vw, 40px)', margin: 0, lineHeight: 1.1 }}>
             Справки
           </h1>
         </div>
         <div className="row" style={{ gap: 'var(--s-3)', alignItems: 'center', flexWrap: 'wrap' }}>
-          <form onSubmit={applySearch} className="row" style={{ gap: 'var(--s-2)' }}>
-            <input className="input" placeholder="Поиск по ФИО / группе / email"
-                   value={searchInput} onChange={(e) => setSearchInput(e.target.value)} style={{ width: 220 }} />
-            <button type="submit" className="btn btn--ghost btn--sm">Найти</button>
-          </form>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as CertType | '')} className="input" style={{ width: 'auto' }}>
-            <option value="">Все типы</option>
-            {(Object.keys(TYPE_LABELS) as CertType[]).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-          </select>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as Status | '')} className="input" style={{ width: 'auto' }}>
-            <option value="">Все статусы</option>
-            {(Object.keys(STATUS_LABELS) as Status[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-          </select>
-          <div className="row" style={{ gap: 'var(--s-1)', alignItems: 'center' }} title="Период по дате создания">
-            <input type="date" className="input mono" value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} style={{ width: 140 }} />
-            <span className="muted" style={{ fontSize: 11 }}>—</span>
-            <input type="date" className="input mono" value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} style={{ width: 140 }} />
-            {(createdFrom || createdTo) && (
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setCreatedFrom(''); setCreatedTo(''); }}>×</button>
-            )}
-          </div>
-          {data && <span className="mono muted">всего: <span className="tnum">{data.total}</span></span>}
+          {!studentMode && (
+            <>
+              <form onSubmit={applySearch} className="row" style={{ gap: 'var(--s-2)' }}>
+                <input className="input" placeholder="Поиск по ФИО / группе / email"
+                       value={searchInput} onChange={(e) => setSearchInput(e.target.value)} style={{ width: 220 }} />
+                <button type="submit" className="btn btn--ghost btn--sm">Найти</button>
+              </form>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as CertType | '')} className="input" style={{ width: 'auto' }}>
+                <option value="">Все типы</option>
+                {(Object.keys(TYPE_LABELS) as CertType[]).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+              </select>
+              <select value={filter} onChange={(e) => setFilter(e.target.value as Status | '')} className="input" style={{ width: 'auto' }}>
+                <option value="">Все статусы</option>
+                {(Object.keys(STATUS_LABELS) as Status[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              </select>
+              <div className="row" style={{ gap: 'var(--s-1)', alignItems: 'center' }} title="Период по дате создания">
+                <input type="date" className="input mono" value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} style={{ width: 140 }} />
+                <span className="muted" style={{ fontSize: 11 }}>—</span>
+                <input type="date" className="input mono" value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} style={{ width: 140 }} />
+                {(createdFrom || createdTo) && (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setCreatedFrom(''); setCreatedTo(''); }}>×</button>
+                )}
+              </div>
+              {data && <span className="mono muted">всего: <span className="tnum">{data.total}</span></span>}
+            </>
+          )}
           <button type="button" className="btn btn--primary" onClick={() => setShowForm(true)}>
             <Plus size={14} strokeWidth={2} /> Новая заявка
           </button>
@@ -223,13 +231,13 @@ function CertificatesView() {
               <thead>
                 <tr>
                   <th>№</th>
-                  <th>ФИО</th>
+                  {!studentMode && <th>ФИО</th>}
                   <th>Группа</th>
                   <th>Тип</th>
                   <th>Куда</th>
                   <th>Статус</th>
                   <th>Комментарий</th>
-                  <th>Действия</th>
+                  <th>{studentMode ? '' : 'Действия'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +248,7 @@ function CertificatesView() {
                   return (
                     <tr key={c.id}>
                       <td className="mono tnum">С-{c.displayNo}</td>
-                      <td><Link href={`/certificates/${c.id}`} className="link">{c.fullName}</Link></td>
+                      {!studentMode && <td><Link href={`/certificates/${c.id}`} className="link">{c.fullName}</Link></td>}
                       <td className="mono">{c.groupName}</td>
                       <td>{TYPE_LABELS[c.certType]}</td>
                       <td className="muted" style={{ fontSize: 'var(--fs-13)' }}>{c.targetOrg}</td>
@@ -251,18 +259,18 @@ function CertificatesView() {
                           <Link href={`/certificates/${c.id}`} className="btn btn--ghost btn--sm">
                             <Eye size={12} strokeWidth={1.75} /> Карточка
                           </Link>
-                          {c.status === 'APPROVED' && (
+                          {!studentMode && c.status === 'APPROVED' && (
                             <Link href={printHref} target="_blank" className="btn btn--ghost btn--sm">
                               <Printer size={12} strokeWidth={1.75} /> Печать
                             </Link>
                           )}
-                          {c.status !== 'APPROVED' && (
+                          {!studentMode && c.status !== 'APPROVED' && (
                             <button onClick={() => decide(c.id, 'APPROVE')} disabled={busy === c.id} className="btn btn--primary btn--sm">Выдать</button>
                           )}
-                          {c.status !== 'REJECTED' && (
+                          {!studentMode && c.status !== 'REJECTED' && (
                             <button onClick={() => decide(c.id, 'REJECT')} disabled={busy === c.id} className="btn btn--danger btn--sm">Отклонить</button>
                           )}
-                          {c.status !== 'PENDING' && (
+                          {!studentMode && c.status !== 'PENDING' && (
                             <button onClick={() => decide(c.id, 'RESET')} disabled={busy === c.id} className="btn btn--ghost btn--sm">В работу</button>
                           )}
                         </div>
@@ -291,6 +299,7 @@ function CertificatesView() {
       {showForm && (
         <NewCertificateModal
           initialStudent={prefillStudent}
+          studentMode={studentMode}
           onClose={() => { setShowForm(false); setPrefillStudent(null); }}
           onCreated={() => { setShowForm(false); setPrefillStudent(null); void load(); }}
         />
@@ -300,16 +309,14 @@ function CertificatesView() {
 }
 
 function NewCertificateModal({
-  onClose, onCreated, initialStudent,
+  onClose, onCreated, initialStudent, studentMode,
 }: {
   onClose: () => void;
   onCreated: () => void;
   initialStudent?: PickedStudent | null;
+  studentMode: boolean;
 }) {
   const [certType, setCertType] = useState<CertType>('STUDY');
-  // Студент выбирается из зеркала Сетевого ПОО — отсюда автозаполняются ФИО,
-  // дата рождения, группа. Поля можно править руками после выбора (на случай,
-  // если в Сетевом ПОО опечатка или нужно скорректировать как пишется в справке).
   const [student, setStudent] = useState<PickedStudent | null>(initialStudent ?? null);
   const [fullName, setFullName] = useState(
     initialStudent
@@ -322,10 +329,37 @@ function NewCertificateModal({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [comment, setComment] = useState('');
-  const [periodFrom, setPeriodFrom] = useState('');
-  const [periodTo, setPeriodTo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fillMyData = useCallback(async () => {
+    setError(null);
+    try {
+      const me = await apiFetch<{
+        studentExternalId: number | null;
+        firstName: string; lastName: string; middleName: string | null;
+      }>('/api/users/me');
+      setFullName(`${me.lastName} ${me.firstName} ${me.middleName ?? ''}`.trim());
+      if (me.studentExternalId) {
+        const d = await apiFetch<{
+          phone?: string; email?: string; birthday?: string;
+          studentGroup?: { id?: number; name?: string };
+        }>(`/api/poozabeduapi/students/${me.studentExternalId}`);
+        if (d.birthday) setBirthDate(d.birthday.slice(0, 10));
+        if (d.studentGroup?.name) setGroupName(d.studentGroup.name);
+        if (d.phone) setPhone(d.phone);
+        if (d.email) setEmail(d.email);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось заполнить ваши данные');
+    }
+  }, []);
+
+  // Студент → автозаполнение при открытии формы.
+  useEffect(() => {
+    if (studentMode && !fullName) void fillMyData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentMode]);
 
   // Если оператор подтянул карточку из Сетевого, по запросу подгрузим телефон —
   // у нас в зеркале телефонов нет, они только в детальном эндпоинте.
@@ -365,7 +399,6 @@ function NewCertificateModal({
           groupName: groupName.trim(), targetOrg: targetOrg.trim(),
           phone: phone.trim(), email: email.trim(),
           comment: comment.trim() || undefined,
-          periodFrom: periodFrom || undefined, periodTo: periodTo || undefined,
         },
       });
       onCreated();
@@ -398,16 +431,23 @@ function NewCertificateModal({
           </select>
         </label>
 
-        <div className="col" style={{ gap: 'var(--s-1)' }}>
-          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Студент (из Сетевого ПОО)</span>
-          <StudentPicker value={student} onChange={onPickStudent} />
-          {student && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={fillFromUpstream}
-                    style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-              Подтянуть телефон/email из Сетевого ПОО
-            </button>
-          )}
-        </div>
+        {studentMode ? (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={fillMyData}
+                  style={{ alignSelf: 'flex-start' }}>
+            Себе
+          </button>
+        ) : (
+          <div className="col" style={{ gap: 'var(--s-1)' }}>
+            <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Студент (из Сетевого ПОО)</span>
+            <StudentPicker value={student} onChange={onPickStudent} />
+            {student && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={fillFromUpstream}
+                      style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                Подтянуть телефон/email из Сетевого ПОО
+              </button>
+            )}
+          </div>
+        )}
 
         <label className="col" style={{ gap: 'var(--s-1)' }}>
           <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>ФИО (можно скорректировать для печати)</span>
@@ -438,17 +478,6 @@ function NewCertificateModal({
           <label className="col" style={{ gap: 'var(--s-1)', flex: 1 }}>
             <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Email</span>
             <input type="email" className="input" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-        </div>
-
-        <div className="row" style={{ gap: 'var(--s-3)' }}>
-          <label className="col" style={{ gap: 'var(--s-1)', flex: 1 }}>
-            <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Период с</span>
-            <input type="date" className="input" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} />
-          </label>
-          <label className="col" style={{ gap: 'var(--s-1)', flex: 1 }}>
-            <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Период по</span>
-            <input type="date" className="input" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
           </label>
         </div>
 

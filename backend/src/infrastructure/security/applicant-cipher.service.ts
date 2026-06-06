@@ -2,15 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
-/**
- * AES-256-GCM шифрование персональных данных абитуриентов.
- *
- * Формат шифротекста: [iv(12)] || [authTag(16)] || [ciphertext(N)].
- * Ключ — 32 байта (hex/base64) из APPLICANTS_ENC_KEY.
- *
- * 152-ФЗ: ПДн (паспорт, СНИЛС, фото и т.д.) хранятся только в зашифрованном виде.
- * Ключ — в окружении/секрет-сторе, не в БД, не в коде.
- */
+/** AES-256-GCM шифрование ПДн абитуриентов. Формат: iv(12)|tag(16)|ct. Ключ — APPLICANTS_ENC_KEY. */
 @Injectable()
 export class ApplicantCipherService implements OnModuleInit {
   private key!: Buffer;

@@ -7,21 +7,7 @@ import { Role } from '../../../domain/enums/role.enum';
 import { AuditService } from '../../services/audit.service';
 import { RequestContext } from '../../../infrastructure/context/request-context';
 
-/**
- * Изменение ролей пользователя АИС.
- *
- * Защитные правила:
- *  - Нельзя самому себе срезать SUPERADMIN — иначе можно случайно потерять
- *    единственный root-аккаунт и закрыть себе вход в админку. Снимать
- *    SUPERADMIN с другого пользователя — ОК.
- *  - Назначить роль SUPERADMIN может только действующий SUPERADMIN —
- *    обычный ADM не должен «подняться» сам через PATCH /:id/roles.
- *  - Роли не могут быть пустым массивом — пользователь без ролей не имеет
- *    смысла, его проще деактивировать.
- *
- * После изменения пользователь должен **перелогиниться** — список ролей
- * хранится в JWT.
- */
+/** PATCH /users/:id/roles. Защита: нельзя снять SUPERADMIN с себя, грант SUPERADMIN — только от SUPERADMIN. */
 @Injectable()
 export class SetUserRolesUseCase {
   constructor(
@@ -41,7 +27,6 @@ export class SetUserRolesUseCase {
     if (!Array.isArray(nextRoles) || nextRoles.length === 0) {
       throw new BadRequestException('Список ролей не может быть пустым');
     }
-    // Уникальные значения, фильтруем мусор.
     const cleaned = Array.from(new Set(nextRoles));
     for (const r of cleaned) {
       if (!Object.values(Role).includes(r)) {
@@ -54,7 +39,6 @@ export class SetUserRolesUseCase {
 
     const oldRoles = [...target.roles];
 
-    // Защита от самосуицида: нельзя срезать SUPERADMIN самому себе.
     const removingSuperFromSelf =
       target.id === actor.id &&
       oldRoles.includes(Role.SUPERADMIN) &&
@@ -63,7 +47,6 @@ export class SetUserRolesUseCase {
       throw new ForbiddenException('Нельзя снять с себя роль SUPERADMIN');
     }
 
-    // Поднимать до SUPERADMIN может только действующий SUPERADMIN.
     const grantingSuper = !oldRoles.includes(Role.SUPERADMIN) && cleaned.includes(Role.SUPERADMIN);
     if (grantingSuper && !actor.roles.includes(Role.SUPERADMIN)) {
       throw new ForbiddenException('Назначить SUPERADMIN может только SUPERADMIN');

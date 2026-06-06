@@ -1,29 +1,16 @@
-/**
- * Преобразование технических ошибок в русскоязычные сообщения для UI.
- *
- * Покрывает:
- *   — ApiError (HTTP-статусы от backend);
- *   — TypeError вида «Cannot read properties of undefined» (отсутствующие поля в ответе / БД);
- *   — сетевые сбои (Failed to fetch);
- *   — всё остальное — аккуратный fallback.
- */
-
 import { ApiError } from '@/lib/api';
 
 export interface FriendlyError {
   title: string;
   hint: string;
-  /** Техническая подсказка — показываем в <pre> для дебага. */
   detail?: string;
 }
 
 export function explainError(err: unknown): FriendlyError {
-  // ── ApiError (backend) ─────────────────────────────────────
   if (err instanceof ApiError) {
     return explainHttpStatus(err.status, err.message);
   }
 
-  // ── TypeError: Cannot read properties of undefined (reading 'x') ──
   if (err instanceof TypeError) {
     const msg = String(err.message ?? '');
     const propMatch =
@@ -51,7 +38,6 @@ export function explainError(err: unknown): FriendlyError {
     };
   }
 
-  // ── Обычный Error ──────────────────────────────────────────
   if (err instanceof Error) {
     if (/fetch|network/i.test(err.message)) {
       return {

@@ -27,8 +27,8 @@ import { PoozabeduApiClient } from '../../../infrastructure/external/poozabeduap
 import { SyncPoozabeduUseCase } from '../../../application/use-cases/poozabedu/sync-poozabedu.use-case';
 import { GetStudentDetailUseCase } from '../../../application/use-cases/poozabedu/get-student-detail.use-case';
 import { GetCollegeGpaUseCase } from '../../../application/use-cases/poozabedu/get-college-gpa.use-case';
+import { GetGroupDebtsUseCase } from '../../../application/use-cases/poozabedu/get-group-debts.use-case';
 import { GetJournalUseCase } from '../../../application/use-cases/poozabedu/get-journal.use-case';
-import { GetScheduleUseCase } from '../../../application/use-cases/poozabedu/get-schedule.use-case';
 import { ListEmployeesUseCase } from '../../../application/use-cases/poozabedu/list-employees.use-case';
 import { GetReportUseCase } from '../../../application/use-cases/poozabedu/get-report.use-case';
 import {
@@ -39,6 +39,10 @@ import {
   PoozabeduStudentGroupRepository,
   PoozabeduStudentRepository,
 } from '../../../domain/repositories/poozabedu-mirror.repository';
+import {
+  USER_REPOSITORY,
+  UserRepository,
+} from '../../../domain/repositories/user.repository';
 
 class ListMirrorStudentsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
@@ -51,23 +55,6 @@ class ListMirrorStudentsDto {
 const STAFF_FULL: Role[] = [Role.SUPERADMIN, Role.ADM, Role.ADMINISTRATION, Role.COM];
 const STAFF_AND_TEACHER: Role[] = [...STAFF_FULL, Role.TEA];
 
-/**
- * Эндпоинты интеграции с Сетевым ПОО.
- *
- * RBAC по уровням доступа:
- *  - **STU** — нет доступа ни к одному эндпоинту (студент свои оценки/расписание
- *    смотрит только в Сетевом ПОО, в АИС у него только заявки/пропуска).
- *  - **TEA** (классный руководитель) — видит **только** свои группы, их журналы
- *    и студентов. Привязка делается по `users.netschool_employee_id` ↔
- *    `poozabedu_student_group.curator_external_id`. Если у TEA-аккаунта поле
- *    `netschool_employee_id` не задано — fail-closed, не видит ничего.
- *  - **COM** — учебная часть. Видит всех студентов и все группы.
- *  - **ADM / SUPERADMIN** — полный доступ.
- *
- * Реализация ограничения для TEA: всегда выясняем список разрешённых
- * `groupExternalIds` через `groupRepo.listOwnedExternalIdsByCurator(...)` и
- * либо фильтруем выдачу, либо отказываем по 403.
- */
 @Controller('poozabeduapi')
 export class PoozabeduApiController {
   constructor(
@@ -75,8 +62,8 @@ export class PoozabeduApiController {
     private readonly syncUc: SyncPoozabeduUseCase,
     private readonly detailUc: GetStudentDetailUseCase,
     private readonly collegeGpaUc: GetCollegeGpaUseCase,
+    private readonly groupDebtsUc: GetGroupDebtsUseCase,
     private readonly journalUc: GetJournalUseCase,
-    private readonly scheduleUc: GetScheduleUseCase,
     private readonly employeesUc: ListEmployeesUseCase,
     private readonly reportUc: GetReportUseCase,
     @Inject(POOZABEDU_DEPARTMENT_REPOSITORY)
@@ -85,6 +72,8 @@ export class PoozabeduApiController {
     private readonly groupRepo: PoozabeduStudentGroupRepository,
     @Inject(POOZABEDU_STUDENT_REPOSITORY)
     private readonly studentRepo: PoozabeduStudentRepository,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepo: UserRepository,
   ) {}
 
   @Roles(Role.SUPERADMIN)
@@ -118,11 +107,6 @@ export class PoozabeduApiController {
     return { ok: true, report };
   }
 
-  /**
-   * Список сотрудников для админских форм (например, привязка TEA-аккаунта
-   * к конкретному классному руководителю в Сетевом ПОО). Не аудитируется —
-   * это справочник без ПДн.
-   */
   @Roles(Role.ADM, Role.SUPERADMIN)
   @Get('employees')
   async listEmployees() {
@@ -143,11 +127,7 @@ export class PoozabeduApiController {
     }));
   }
 
-  /**
-   * Список групп. Полный для STAFF, ограниченный для TEA. Поле `educationForm`
-   * помогает фронту разделять очников/заочников.
-   */
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('mirror/groups')
   async listGroups(@CurrentUser() user: AuthenticatedUser | null) {
     const items = await this.groupRepo.listAll();
@@ -175,7 +155,6 @@ export class PoozabeduApiController {
     const isActive = q.isActive === undefined ? true : q.isActive === 'true';
     const allowed = await this.allowedGroupIds(user);
 
-    // Если TEA пытается фильтровать по конкретной группе — она должна быть «своей».
     if (allowed !== 'all' && q.groupExternalId !== undefined && !allowed.has(q.groupExternalId)) {
       throw new ForbiddenException('Эта группа не закреплена за вами');
     }
@@ -210,12 +189,7 @@ export class PoozabeduApiController {
 
   // ────────── on-demand из Сетевого ПОО ──────────
 
-  /**
-   * Полная карточка с ПДн (паспорт/адрес/СНИЛС/родители).
-   * Для TEA: только если студент в одной из его групп. Это первый по логике
-   * чувствительный эндпоинт — должны быть особенно строги.
-   */
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('students/:externalId')
   async getStudentDetail(
     @Param('externalId', ParseIntPipe) externalId: number,
@@ -225,12 +199,7 @@ export class PoozabeduApiController {
     return this.detailUc.execute(externalId);
   }
 
-  /**
-   * Средний балл студента в техникуме — по реальным отметкам в журнале.
-   * Намеренно отдельный эндпоинт, потому что считается на лету и тяжелее
-   * остальных полей карточки. UI грузит лениво, после основной части досье.
-   */
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('students/:externalId/college-gpa')
   async getStudentCollegeGpa(
     @Param('externalId', ParseIntPipe) externalId: number,
@@ -240,9 +209,19 @@ export class PoozabeduApiController {
     return this.collegeGpaUc.execute(externalId);
   }
 
+  @Roles(...STAFF_AND_TEACHER)
+  @Get('groups/:groupExternalId/debts')
+  async getGroupDebts(
+    @Param('groupExternalId', ParseIntPipe) groupExternalId: number,
+    @CurrentUser() user: AuthenticatedUser | null,
+  ) {
+    await this.assertGroupVisible(groupExternalId, user);
+    return this.groupDebtsUc.execute(groupExternalId);
+  }
+
   // ────────── журнал (on-demand proxy) ──────────
 
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('journal/groups')
   async listJournalGroups(@CurrentUser() user: AuthenticatedUser | null) {
     const upstream = await this.journalUc.listGroups();
@@ -251,7 +230,7 @@ export class PoozabeduApiController {
     return upstream.filter((g) => allowed.has(g.id));
   }
 
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('journal/groups/:groupExternalId/entries')
   async listJournalGroupEntries(
     @Param('groupExternalId', ParseIntPipe) groupExternalId: number,
@@ -261,11 +240,7 @@ export class PoozabeduApiController {
     return this.journalUc.listGroupEntries(groupExternalId);
   }
 
-  /**
-   * Журнал по предмету. Для TEA — обязательная проверка, что `gradebookId`
-   * принадлежит одной из его групп. STAFF получает без ограничений.
-   */
-  @Roles(...STAFF_AND_TEACHER)
+  @Roles(...STAFF_AND_TEACHER, Role.STU)
   @Get('journal/gradebooks/:gradebookId/subjects/:subjectId')
   async getJournalSubject(
     @Param('gradebookId', ParseIntPipe) gradebookId: number,
@@ -279,66 +254,9 @@ export class PoozabeduApiController {
     return this.journalUc.getSubject(gradebookId, subjectId, constraints);
   }
 
-  // ────────── расписание (on-demand proxy) ──────────
-
-  @Roles(...STAFF_AND_TEACHER)
-  @Get('schedule/teachers')
-  async listScheduleTeachers() {
-    return this.scheduleUc.listTeachers();
-  }
-
-  @Roles(...STAFF_AND_TEACHER)
-  @Get('schedule/classrooms')
-  async listScheduleClassrooms() {
-    return this.scheduleUc.listClassrooms();
-  }
-
-  @Roles(...STAFF_AND_TEACHER)
-  @Get('schedule/groups/:groupExternalId/entries')
-  async getScheduleGroupEntries(
-    @Param('groupExternalId', ParseIntPipe) groupExternalId: number,
-    @CurrentUser() user: AuthenticatedUser | null,
-  ) {
-    await this.assertGroupVisible(groupExternalId, user);
-    return this.scheduleUc.getGroupEntries(groupExternalId);
-  }
-
-  @Roles(...STAFF_AND_TEACHER)
-  @Get('schedule/timetable')
-  async getScheduleTimetable(
-    @Query('from') dateFrom: string,
-    @Query('to') dateTo: string,
-    @Query('type') type: 'studentGroup' | 'teacher',
-    @Query('id', ParseIntPipe) id: number,
-    @CurrentUser() user: AuthenticatedUser | null,
-  ) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
-      throw new BadRequestException('from/to ожидаются в формате yyyy-mm-dd');
-    }
-    if (type !== 'studentGroup' && type !== 'teacher') {
-      throw new BadRequestException("type ожидается 'studentGroup' или 'teacher'");
-    }
-    // TEA может смотреть только СВОЁ расписание как преподавателя
-    // (id совпадает с netschoolEmployeeId учётки). Чужой учитель — отказ.
-    // STAFF — без ограничений.
-    if (!isStaffFull(user) && type === 'teacher') {
-      if (!user?.netschoolEmployeeId || user.netschoolEmployeeId !== id) {
-        throw new ForbiddenException('Расписание чужого преподавателя недоступно');
-      }
-    }
-    return this.scheduleUc.getTimetable(dateFrom, dateTo, type, id);
-  }
-
   // ────────── Отчёты Сетевого ПОО ──────────
 
-  /**
-   * Универсальный прокси к `/services/reports/*`. Путь после `/reports/`
-   * передаётся параметром `path`. Дополнительные query-параметры (departmentId,
-   * specialtyId и т.п.) автоматически прокидываются в upstream — кроме самого `path`.
-   *
-   * Примеры путей: `years`, `years/2025/terms`, `group/1873/students`,
-   * `curator/group-attestation/1873`.
-   */
+  // Прокси к /services/reports/*; path в query, остальные query → upstream
   @Roles(...STAFF_AND_TEACHER)
   @Get('reports')
   async getReport(
@@ -358,12 +276,7 @@ export class PoozabeduApiController {
 
   // ────────── helpers ──────────
 
-  /**
-   * Возвращает множество externalId групп, видимых пользователю.
-   * `'all'` — без ограничений (STAFF). `Set<number>` — конкретный список (TEA).
-   * Пустой Set означает «нет ни одной группы» (TEA без привязки) — эндпоинты
-   * вернут пустые списки или 403.
-   */
+  /** 'all' для STAFF; Set externalId групп для TEA/STU; пустой = нет доступа. */
   private async allowedGroupIds(user: AuthenticatedUser | null): Promise<'all' | Set<number>> {
     if (!user) return new Set();
     if (isStaffFull(user)) return 'all';
@@ -371,6 +284,13 @@ export class PoozabeduApiController {
       if (!user.netschoolEmployeeId) return new Set();
       const ids = await this.groupRepo.listOwnedExternalIdsByCurator(user.netschoolEmployeeId);
       return new Set(ids);
+    }
+    if (user.roles.includes(Role.STU)) {
+      const u = await this.userRepo.findById(user.id);
+      if (!u?.studentExternalId) return new Set();
+      const student = await this.studentRepo.findByExternalId(u.studentExternalId);
+      if (!student?.groupExternalId) return new Set();
+      return new Set([student.groupExternalId]);
     }
     return new Set();
   }
@@ -390,6 +310,15 @@ export class PoozabeduApiController {
     studentExternalId: number,
     user: AuthenticatedUser | null,
   ): Promise<void> {
+    if (!user) throw new ForbiddenException('Неаутентифицирован');
+
+    // STU видит только своё досье
+    if (user.roles.includes(Role.STU)) {
+      const u = await this.userRepo.findById(user.id);
+      if (u?.studentExternalId && u.studentExternalId === studentExternalId) return;
+      throw new ForbiddenException('Доступ только к собственному досье');
+    }
+
     const allowed = await this.allowedGroupIds(user);
     if (allowed === 'all') return;
     const student = await this.studentRepo.findByExternalId(studentExternalId);

@@ -4,13 +4,16 @@ import {
   CertificateRequestRepository,
 } from '../../../domain/repositories/certificate-request.repository';
 import { AuditService } from '../../services/audit.service';
+import { NotifyService } from '../../services/notify.service';
 import { RequestContext } from '../../../infrastructure/context/request-context';
-import {
-  MAX_BOT_NOTIFIER,
-  MaxBotNotifier,
-} from '../../../domain/services/max-bot-notifier';
 
 export type CertDecision = 'APPROVE' | 'REJECT' | 'RESET';
+
+const STATUS_RU: Record<string, string> = {
+  PENDING: 'возвращена в работу',
+  APPROVED: 'выдана',
+  REJECTED: 'отклонена',
+};
 
 export interface SetCertificateStatusInput {
   certificateId: string;
@@ -25,7 +28,7 @@ export class SetCertificateStatusUseCase {
     private readonly certs: CertificateRequestRepository,
     private readonly audit: AuditService,
     private readonly reqCtx: RequestContext,
-    @Inject(MAX_BOT_NOTIFIER) private readonly bot: MaxBotNotifier,
+    private readonly notify: NotifyService,
   ) {}
 
   async execute(input: SetCertificateStatusInput): Promise<void> {
@@ -60,14 +63,20 @@ export class SetCertificateStatusUseCase {
       newState: { status: cert.status, statusComment: cert.statusComment },
     });
 
-    // Push в Max-бот, если у заявки есть max_user_id (актуально для заявок,
-    // созданных через бота). Email-уведомления намеренно не шлём: канал общения
-    // со студентом — Max-бот; email в карточке остаётся как контактная информация.
-    if (oldState.status !== cert.status && cert.maxUserId) {
-      await this.bot.notifyUser({
-        userId: cert.maxUserId,
-        newStatus: cert.status,
-        comment: cert.statusComment,
+    // Уведомление в MAX через outbox (CompositeNotificationChannel найдёт
+    // user.maxChatId). Шлём только при реальной смене статуса.
+    if (oldState.status !== cert.status && cert.submitterUserId) {
+      const verb = STATUS_RU[cert.status] ?? cert.status;
+      const lines = [
+        `Справка № С-${cert.displayNo ?? '?'} ${verb}.`,
+        `Тип: ${cert.certType}`,
+      ];
+      if (cert.statusComment) lines.push(`Комментарий: ${cert.statusComment}`);
+      await this.notify.enqueue({
+        userId: cert.submitterUserId,
+        to: cert.email,
+        subject: 'Статус заявки на справку изменён',
+        text: lines.join('\n'),
       });
     }
   }

@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/lib/auth-context';
 import { ROLE_LABELS } from '@/lib/types';
+import { MaxIntegrationPanel } from '@/components/max-integration-panel';
 
 export default function MePage() {
   const { user } = useAuth();
@@ -25,6 +26,8 @@ export default function MePage() {
         />
         <Row label="ID" value={<code className="mono" style={{ fontSize: 'var(--fs-12)' }}>{user.id}</code>} last />
       </dl>
+
+      <MaxIntegrationPanel />
     </div>
   );
 }

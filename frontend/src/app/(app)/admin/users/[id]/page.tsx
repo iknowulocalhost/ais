@@ -13,12 +13,6 @@ const ALL_ROLES: Role[] = [
   'SUPERADMIN', 'ADM', 'ADMINISTRATION', 'COM', 'TEA', 'STU',
 ];
 
-/**
- * Карточка пользователя для админа.
- * Сейчас умеет только привязывать к сотруднику Сетевого ПОО (для TEA-роли).
- * В будущем сюда уедут блок ролей, статус, генерация студ. аккаунтов.
- */
-
 interface UserView {
   id: string;
   email: string;
@@ -30,6 +24,15 @@ interface UserView {
   createdAt: string;
   lastLoginAt?: string | null;
   netschoolEmployeeId?: number | null;
+  studentExternalId?: number | null;
+}
+
+interface MirrorStudent {
+  externalId: number;
+  lastName: string;
+  firstName: string;
+  middleName: string | null;
+  groupName: string | null;
 }
 
 interface PzaEmployee {
@@ -109,11 +112,9 @@ function UserDetail() {
         </div>
       </header>
 
-      {/* Редактор ролей */}
       <RolesSection user={user} onSaved={() => void reload()} />
-
-      {/* Привязка к сотруднику Сетевого ПОО */}
       <NetschoolEmployeeSection user={user} onSaved={() => void reload()} />
+      <StudentBindingSection user={user} onSaved={() => void reload()} />
     </div>
   );
 }
@@ -139,14 +140,12 @@ function RolesSection({ user, onSaved }: { user: UserView; onSaved: () => void }
   }
 
   function disabledReason(role: Role): string | null {
-    // SUPERADMIN на себе нельзя срезать
     if (role === 'SUPERADMIN' && isSelf && user.roles.includes('SUPERADMIN') && !picked.has('SUPERADMIN')) {
-      return null; // toggle off — сами поймаем при сохранении? нет, лучше сразу заблокировать
+      return null;
     }
     if (role === 'SUPERADMIN' && isSelf && user.roles.includes('SUPERADMIN')) {
       return 'нельзя снять с себя';
     }
-    // SUPERADMIN может назначать только SUPERADMIN
     if (role === 'SUPERADMIN' && !user.roles.includes('SUPERADMIN') && !actorIsSuper) {
       return 'только SUPERADMIN может назначить';
     }
@@ -249,14 +248,12 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<number | null>(user.netschoolEmployeeId ?? null);
 
-  // Загружаем список сотрудников один раз — 162 записи, помещается в DOM спокойно.
   useEffect(() => {
     apiFetch<PzaEmployee[]>('/api/poozabeduapi/employees')
       .then((es) => setEmployees(es))
       .catch((e) => setError(explainError(e).hint));
   }, []);
 
-  // Сбрасываем pick если в БД изменилось
   useEffect(() => {
     setPicked(user.netschoolEmployeeId ?? null);
   }, [user.netschoolEmployeeId]);
@@ -325,7 +322,6 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
       {error && <div className="callout callout--danger"><span>{error}</span></div>}
 
       <div className="card col" style={{ padding: 'var(--s-4)', gap: 'var(--s-3)' }}>
-        {/* Текущая привязка */}
         <div className="col" style={{ gap: 4 }}>
           <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Текущая привязка</span>
           {currentEmployee ? (
@@ -361,7 +357,6 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
           )}
         </div>
 
-        {/* Поиск */}
         <div className="input-group">
           <Search size={14} className="icon" />
           <input
@@ -372,7 +367,6 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
           />
         </div>
 
-        {/* Список */}
         {!employees ? (
           <div className="muted">Загрузка справочника сотрудников…</div>
         ) : (
@@ -421,7 +415,6 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
           </div>
         )}
 
-        {/* Действия */}
         <div className="row" style={{ gap: 'var(--s-2)', justifyContent: 'flex-end' }}>
           {dirty && (
             <button
@@ -447,6 +440,186 @@ function NetschoolEmployeeSection({ user, onSaved }: { user: UserView; onSaved: 
       <style jsx>{`
         .emp-row:hover { background: var(--ais-paper-2); }
       `}</style>
+    </section>
+  );
+}
+
+function StudentBindingSection({ user, onSaved }: { user: UserView; onSaved: () => void }) {
+  const isStudent = user.roles.includes('STU');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [candidates, setCandidates] = useState<MirrorStudent[] | null>(null);
+  const [picked, setPicked] = useState<number | null>(user.studentExternalId ?? null);
+  const [currentInfo, setCurrentInfo] = useState<MirrorStudent | null>(null);
+
+  useEffect(() => {
+    if (!picked) { setCurrentInfo(null); return; }
+    apiFetch<{
+      id: number; firstName: string; lastName: string; middleName?: string;
+      studentGroup?: { name?: string };
+    }>(`/api/poozabeduapi/students/${picked}`)
+      .then((s) => setCurrentInfo({
+        externalId: s.id, lastName: s.lastName, firstName: s.firstName,
+        middleName: s.middleName ?? null, groupName: s.studentGroup?.name ?? null,
+      }))
+      .catch(() => setCurrentInfo(null));
+  }, [picked]);
+
+  useEffect(() => {
+    if (candidates || picked) return;
+    const fio = `${user.lastName} ${user.firstName}`.trim();
+    if (fio) {
+      setSearchInput(fio);
+      setSearch(fio);
+    }
+  }, [user.lastName, user.firstName, candidates, picked]);
+
+  useEffect(() => {
+    if (!search.trim() || search.trim().length < 2) { setCandidates(null); return; }
+    apiFetch<{ items: MirrorStudent[]; total: number }>('/api/poozabeduapi/mirror/students', {
+      query: { search: search.trim(), isActive: 'true', limit: 25 },
+    })
+      .then((r) => setCandidates(r.items))
+      .catch((e) => setError(e instanceof ApiError ? e.message : explainError(e).hint));
+  }, [search]);
+
+  async function save(newId: number | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${user.id}/student-external-id`, {
+        method: 'PATCH',
+        body: { studentExternalId: newId },
+      });
+      setPicked(newId);
+      onSaved();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : explainError(e).hint);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const dirty = picked !== (user.studentExternalId ?? null);
+
+  return (
+    <section className="col" style={{ gap: 'var(--s-3)' }}>
+      <header className="col" style={{ gap: 4 }}>
+        <h2 className="display" style={{ fontSize: 'var(--fs-22)', margin: 0 }}>
+          Привязка к студенту Сетевого ПОО
+        </h2>
+        <p className="muted" style={{ margin: 0, fontSize: 'var(--fs-13)' }}>
+          Связь с карточкой студента в зеркале — нужна для сводки, среднего балла, расписания.
+          Если пользователь имеет роль <b>Студент</b> и ФИО совпадает с одним конкретным
+          студентом в зеркале, при следующем входе привязка установится автоматически.
+          {!isStudent && (
+            <> У пользователя сейчас нет роли «Студент» — поле не используется при входе.</>
+          )}
+        </p>
+      </header>
+
+      {error && <div className="callout callout--danger"><span>{error}</span></div>}
+
+      <div className="card" style={{ padding: 'var(--s-4)' }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--s-3)', flexWrap: 'wrap' }}>
+          <div className="col" style={{ gap: 2 }}>
+            <span className="muted mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Сейчас привязан
+            </span>
+            {picked ? (
+              <span style={{ fontSize: 'var(--fs-14)' }}>
+                {currentInfo
+                  ? <>{currentInfo.lastName} {currentInfo.firstName}{currentInfo.middleName ? ` ${currentInfo.middleName}` : ''} <span className="mono muted">· {currentInfo.groupName ?? '—'} · #{currentInfo.externalId}</span></>
+                  : <span className="mono muted">#{picked}</span>}
+              </span>
+            ) : (
+              <span className="muted" style={{ fontSize: 'var(--fs-14)' }}>привязки нет</span>
+            )}
+          </div>
+          {picked !== null && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void save(null)}
+              disabled={busy}
+            >
+              Снять привязку
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="card col" style={{ padding: 'var(--s-4)', gap: 'var(--s-3)' }}>
+        <form
+          onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); }}
+          className="row"
+          style={{ gap: 'var(--s-2)' }}
+        >
+          <div className="input-group" style={{ flex: 1, minWidth: 240 }}>
+            <Search size={14} className="icon" />
+            <input
+              className="input"
+              placeholder="Фамилия или часть ФИО"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="btn btn--ghost btn--sm">Найти</button>
+        </form>
+
+        {candidates && candidates.length === 0 && (
+          <div className="muted" style={{ fontSize: 'var(--fs-13)' }}>
+            По «{search}» ничего не найдено. Попробуйте ввести только фамилию или часть имени.
+          </div>
+        )}
+
+        {candidates && candidates.length > 0 && (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-1)' }}>
+            {candidates.map((s) => {
+              const selected = picked === s.externalId;
+              return (
+                <li key={s.externalId}>
+                  <button
+                    type="button"
+                    onClick={() => save(s.externalId)}
+                    disabled={busy || selected}
+                    className="emp-row"
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                      gap: 'var(--s-3)',
+                      padding: 'var(--s-2) var(--s-3)',
+                      border: '1px solid var(--ais-line)',
+                      borderRadius: 'var(--r-6)',
+                      background: selected ? 'var(--ais-paper-2)' : 'transparent',
+                      cursor: selected ? 'default' : 'pointer',
+                      textAlign: 'left',
+                      color: 'inherit',
+                    }}
+                  >
+                    <span style={{ fontSize: 'var(--fs-14)' }}>
+                      {s.lastName} {s.firstName}{s.middleName ? ` ${s.middleName}` : ''}
+                    </span>
+                    <span className="mono muted" style={{ fontSize: 11 }}>
+                      {s.groupName ?? '—'} · #{s.externalId}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {dirty && (
+          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>
+            Изменения сохраняются по клику на запись.
+          </span>
+        )}
+      </div>
     </section>
   );
 }

@@ -1,19 +1,12 @@
 import type { AuthUser } from './types';
 
-/**
- * Студент-только: единственная роль — STU. Любая дополнительная роль
- * (TEA, ADM и т.д.) → пользователь считается «сотрудником» и получает
- * полный административный шелл.
- */
+/** STU без дополнительных ролей. */
 export function isStudentOnly(user: AuthUser | null): boolean {
   if (!user) return false;
   return user.roles.length === 1 && user.roles[0] === 'STU';
 }
 
-/**
- * Учитель-только: TEA без административных ролей. На /dashboard такому
- * пользователю показываем учительскую сводку (своя группа + долги + посещаемость).
- */
+/** TEA без административных ролей. */
 export function isTeacherOnly(user: AuthUser | null): boolean {
   if (!user) return false;
   if (

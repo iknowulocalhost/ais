@@ -29,7 +29,6 @@ export interface SyncReport {
   departments: { total: number; deactivated: number };
   groups: { total: number; deactivated: number };
   students: { total: number; pages: number; deactivated: number };
-  /** Аккаунты студентов, которым пришлось переключить is_active по итогам sync'а. */
   accounts: { disabled: number; enabled: number };
   startedAt: Date;
   finishedAt: Date;
@@ -38,18 +37,7 @@ export interface SyncReport {
 
 const STUDENT_PAGE_SIZE = 200;
 
-/**
- * Полная синхронизация трёх каталогов из Сетевого ПОО → наше «зеркало».
- * Делается под ОДНОЙ сессией (`withSession`), чтобы не дёргать login-logout
- * между шагами — у IRTech ограниченный пул сессий.
- *
- * Порядок: departments → groups → students (по убыванию редкости и логически
- * сверху вниз). Все три шага объединяются в один аудит-запись.
- *
- * Стратегия дельт: collect-then-upsert. Полностью читаем upstream в память,
- * потом одной транзакцией upsert + одна `deactivateExcept`. Промежуточных
- * несогласованных состояний у клиента UI не наблюдается.
- */
+/** Полная синхронизация зеркала Сетевого ПОО: departments → groups → students. */
 @Injectable()
 export class SyncPoozabeduUseCase {
   private readonly logger = new Logger(SyncPoozabeduUseCase.name);
@@ -91,10 +79,7 @@ export class SyncPoozabeduUseCase {
     await this.studentRepo.upsertMany(studentDomain);
     const studentDeactivated = await this.studentRepo.deactivateExcept(studentDomain.map((s) => s.externalId));
 
-    // После того как зеркало студентов обновилось — выравниваем `users.is_active`
-    // под `poozabedu_student.is_active`. При отчислении студент в зеркале
-    // отмечается inactive, и его аккаунт АИС автоматически отключается; при
-    // восстановлении в Сетевом — аккаунт возвращается к жизни.
+    // Выравниваем users.is_active под poozabedu_student.is_active.
     const accountSync = await this.userRepo.syncActiveFromStudentMirror();
 
     const finishedAt = new Date();
@@ -146,8 +131,7 @@ export class SyncPoozabeduUseCase {
       all.push(...page.students);
       if (page.students.length < STUDENT_PAGE_SIZE) break;
       pageIndex++;
-      // Сейф-лимит на случай если IRTech начнёт возвращать пустую страницу.
-      if (pageIndex > 100) break;
+      if (pageIndex > 100) break; // safety cap
     }
     return all;
   }
@@ -157,7 +141,7 @@ export class SyncPoozabeduUseCase {
 
 function mapDept(d: PzaDepartment, now: Date): PoozabeduDepartment {
   return new PoozabeduDepartment(
-    '',                   // id заполнит БД (uuid default)
+    '', // id ← БД (uuid default)
     d.id,
     (d.name ?? '').trim(),
     d.managerId ?? null,
@@ -199,11 +183,7 @@ function mapStudent(s: PzaStudentSummary, now: Date): PoozabeduStudent {
   );
 }
 
-/**
- * IRTech отдаёт даты в формате `2009-02-07T00:00:00.0000000` (7 цифр после точки).
- * `new Date(...)` это сжуёт, но приведение к началу суток в локальной зоне ОО
- * нам важнее. Берём только дату, без времени.
- */
+/** IRTech-дата (`2009-02-07T00:00:00.0000000`) → локальное начало суток. */
 function parseIrTechDate(s: string | undefined | null): Date | null {
   if (!s) return null;
   const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);

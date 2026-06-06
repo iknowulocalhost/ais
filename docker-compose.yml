@@ -93,6 +93,12 @@ services:
       target: production
     container_name: ais_backend
     restart: unless-stopped
+    # CSV-выгрузки из 1С (приказы о зачислении, переменах) лежат рядом с
+    # исходниками, монтируем read-only — приложение только читает.
+    # Без этого OrderLookupService падает с ENOENT и автозаполнение печатных
+    # форм отключено.
+    volumes:
+      - ./backend/data:/app/data:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +108,10 @@ services:
         condition: service_started
     environment:
       NODE_ENV: ${NODE_ENV:-production}
+      # У провайдера колледжа AAAA для poo.zabedu.ru/chtotib.ru — `100::1`
+      # (discard-prefix). Node 18+ по умолчанию пробует IPv6 первым и виснет
+      # ETIMEDOUT. Принудительно предпочитаем IPv4.
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
       APP_PORT: 3001
       DB_HOST: postgres
       DB_PORT: 5432
@@ -128,6 +138,25 @@ services:
       POOZABEDU_PASSWORD: ${POOZABEDU_PASSWORD:-}
       POOZABEDU_TIMEOUT_MS: ${POOZABEDU_TIMEOUT_MS:-10000}
       POOZABEDU_MIN_INTERVAL_MS: ${POOZABEDU_MIN_INTERVAL_MS:-500}
+      # Active Directory (LDAP) — если LDAP_SERVER_URI не задан, фича выключена.
+      LDAP_SERVER_URI: ${LDAP_SERVER_URI:-}
+      LDAP_PORT: ${LDAP_PORT:-389}
+      LDAP_CONNECT_TIMEOUT_MS: ${LDAP_CONNECT_TIMEOUT_MS:-5000}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
+      LDAP_SEARCH_BASE: ${LDAP_SEARCH_BASE:-}
+      LDAP_USER_FILTER: ${LDAP_USER_FILTER:-}
+      LDAP_USER_ATTRIBUTES: ${LDAP_USER_ATTRIBUTES:-}
+      LDAP_DEFAULT_EMAIL_DOMAIN: ${LDAP_DEFAULT_EMAIL_DOMAIN:-local}
+      LDAP_ADMIN_GROUP_DN: ${LDAP_ADMIN_GROUP_DN:-}
+      LDAP_STAFF_GROUP: ${LDAP_STAFF_GROUP:-}
+      LDAP_ORGANIZER_GROUP: ${LDAP_ORGANIZER_GROUP:-}
+      LDAP_USER_EXCLUDE_OUS: ${LDAP_USER_EXCLUDE_OUS:-}
+      # MAX-бот (мессенджер max.ru). Если URL/секрет пустые — фича выключена,
+      # уведомления просто пропускаются (см. CompositeNotificationChannel).
+      MAX_BOT_URL: ${MAX_BOT_URL:-}
+      MAX_BOT_AIS_SHARED_SECRET: ${MAX_BOT_AIS_SHARED_SECRET:-}
+      MAX_BOT_USERNAME: ${MAX_BOT_USERNAME:-}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     networks:

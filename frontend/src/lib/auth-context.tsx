@@ -29,11 +29,6 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/**
- * Восстановление сессии по перезагрузке: если access есть в localStorage,
- * тянем /auth/me. 401 → refresh попробует сам (через apiFetch), если и он упал —
- * onAuthFailure выкинет на /login.
- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -84,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      /* даже если сервер недоступен — локально всё равно вычищаем */
+      /* no-op */
     }
     clearTokens();
     setUser(null);

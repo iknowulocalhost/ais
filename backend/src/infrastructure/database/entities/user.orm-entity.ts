@@ -54,4 +54,13 @@ export class UserOrmEntity {
 
   @Column({ name: 'student_external_id', type: 'integer', nullable: true })
   studentExternalId!: number | null;
+
+  @Column({ name: 'sam_account_name', type: 'varchar', length: 64, nullable: true })
+  samAccountName!: string | null;
+
+  @Column({ name: 'max_chat_id', type: 'varchar', length: 64, nullable: true })
+  maxChatId!: string | null;
+
+  @Column({ name: 'max_link_prompt_skip_count', type: 'int', default: 0 })
+  maxLinkPromptSkipCount!: number;
 }

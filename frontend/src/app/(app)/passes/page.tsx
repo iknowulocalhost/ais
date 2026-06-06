@@ -8,6 +8,8 @@ import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
 import { StudentPicker, type PickedStudent } from '@/components/student-picker';
+import { useAuth } from '@/lib/auth-context';
+import { isStudentOnly } from '@/lib/role-helpers';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 type Hostel = 'NONE' | 'H1' | 'H2' | 'H3';
@@ -63,6 +65,8 @@ export default function PassesPage() {
 }
 
 function PassesView() {
+  const { user } = useAuth();
+  const studentMode = isStudentOnly(user);
   const [filter, setFilter] = useState<Status | ''>('');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -177,38 +181,42 @@ function PassesView() {
       <header className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--s-3)' }}>
         <div className="col" style={{ gap: 'var(--s-2)' }}>
           <div className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-            учебная часть
+            {studentMode ? 'мои заявки' : 'учебная часть'}
           </div>
           <h1 className="display" style={{ fontSize: 'clamp(28px, 3vw, 40px)', margin: 0, lineHeight: 1.1 }}>
             Пропуска в общежитие
           </h1>
         </div>
         <div className="row" style={{ gap: 'var(--s-3)', alignItems: 'center', flexWrap: 'wrap' }}>
-          <form onSubmit={applySearch} className="row" style={{ gap: 'var(--s-2)' }}>
-            <input
-              className="input"
-              placeholder="Поиск по ФИО / группе"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              style={{ width: 220 }}
-            />
-            <button type="submit" className="btn btn--ghost btn--sm">Найти</button>
-          </form>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as Status | '')} className="input" style={{ width: 'auto' }}>
-            <option value="">Все статусы</option>
-            {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-            ))}
-          </select>
-          <div className="row" style={{ gap: 'var(--s-1)', alignItems: 'center' }} title="Период по дате создания">
-            <input type="date" className="input mono" value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} style={{ width: 140 }} />
-            <span className="muted" style={{ fontSize: 11 }}>—</span>
-            <input type="date" className="input mono" value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} style={{ width: 140 }} />
-            {(createdFrom || createdTo) && (
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setCreatedFrom(''); setCreatedTo(''); }}>×</button>
-            )}
-          </div>
-          {data && <span className="mono muted">всего: <span className="tnum">{data.total}</span></span>}
+          {!studentMode && (
+            <>
+              <form onSubmit={applySearch} className="row" style={{ gap: 'var(--s-2)' }}>
+                <input
+                  className="input"
+                  placeholder="Поиск по ФИО / группе"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  style={{ width: 220 }}
+                />
+                <button type="submit" className="btn btn--ghost btn--sm">Найти</button>
+              </form>
+              <select value={filter} onChange={(e) => setFilter(e.target.value as Status | '')} className="input" style={{ width: 'auto' }}>
+                <option value="">Все статусы</option>
+                {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+              <div className="row" style={{ gap: 'var(--s-1)', alignItems: 'center' }} title="Период по дате создания">
+                <input type="date" className="input mono" value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} style={{ width: 140 }} />
+                <span className="muted" style={{ fontSize: 11 }}>—</span>
+                <input type="date" className="input mono" value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} style={{ width: 140 }} />
+                {(createdFrom || createdTo) && (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setCreatedFrom(''); setCreatedTo(''); }}>×</button>
+                )}
+              </div>
+              {data && <span className="mono muted">всего: <span className="tnum">{data.total}</span></span>}
+            </>
+          )}
           <button type="button" className="btn btn--primary" onClick={() => setShowForm(true)}>
             <Plus size={14} strokeWidth={2} /> Новая заявка
           </button>
@@ -230,20 +238,22 @@ function PassesView() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ФИО</th>
+                  {!studentMode && <th>ФИО</th>}
                   <th>Группа / должность</th>
                   <th>Общежитие</th>
                   <th>Статус</th>
                   <th>Комментарий</th>
-                  <th>Действия</th>
+                  <th>{studentMode ? '' : 'Действия'}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((p) => (
                   <tr key={p.id}>
-                    <td>
-                      <Link href={`/passes/${p.id}`} className="link">{p.fullName}</Link>
-                    </td>
+                    {!studentMode && (
+                      <td>
+                        <Link href={`/passes/${p.id}`} className="link">{p.fullName}</Link>
+                      </td>
+                    )}
                     <td className="mono">{p.groupOrPosition}</td>
                     <td>{HOSTEL_LABELS[p.hostel]}</td>
                     <td><span className={`badge ${STATUS_VARIANT[p.status]}`}>{STATUS_LABELS[p.status]}</span></td>
@@ -258,17 +268,17 @@ function PassesView() {
                             Квитанция
                           </button>
                         )}
-                        {p.status !== 'APPROVED' && (
+                        {!studentMode && p.status !== 'APPROVED' && (
                           <button onClick={() => decide(p.id, 'APPROVE')} disabled={busy === p.id} className="btn btn--primary btn--sm">
                             Выдать
                           </button>
                         )}
-                        {p.status !== 'REJECTED' && (
+                        {!studentMode && p.status !== 'REJECTED' && (
                           <button onClick={() => decide(p.id, 'REJECT')} disabled={busy === p.id} className="btn btn--danger btn--sm">
                             Отклонить
                           </button>
                         )}
-                        {p.status !== 'PENDING' && (
+                        {!studentMode && p.status !== 'PENDING' && (
                           <button onClick={() => decide(p.id, 'RESET')} disabled={busy === p.id} className="btn btn--ghost btn--sm">
                             В работу
                           </button>
@@ -298,6 +308,7 @@ function PassesView() {
       {showForm && (
         <NewPassModal
           initialStudent={prefillStudent}
+          studentMode={studentMode}
           onClose={() => { setShowForm(false); setPrefillStudent(null); }}
           onCreated={() => { setShowForm(false); setPrefillStudent(null); void load(); }}
         />
@@ -309,11 +320,12 @@ function PassesView() {
 type PassSubject = 'student' | 'other';
 
 function NewPassModal({
-  onClose, onCreated, initialStudent,
+  onClose, onCreated, initialStudent, studentMode,
 }: {
   onClose: () => void;
   onCreated: () => void;
   initialStudent?: PickedStudent | null;
+  studentMode: boolean;
 }) {
   // Заявку могут оформлять как на студента (тогда тянем из Сетевого ПОО),
   // так и на сотрудника / визитёра — тогда поля свободные.
@@ -329,6 +341,30 @@ function NewPassModal({
   const [ticket, setTicket] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fillMyData = useCallback(async () => {
+    setError(null);
+    try {
+      const me = await apiFetch<{
+        studentExternalId: number | null;
+        firstName: string; lastName: string; middleName: string | null;
+      }>('/api/users/me');
+      setFullName(`${me.lastName} ${me.firstName} ${me.middleName ?? ''}`.trim());
+      if (me.studentExternalId) {
+        const d = await apiFetch<{ studentGroup?: { name?: string } }>(
+          `/api/poozabeduapi/students/${me.studentExternalId}`,
+        );
+        if (d.studentGroup?.name) setGroupOrPosition(d.studentGroup.name);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось заполнить ваши данные');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (studentMode && !fullName) void fillMyData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentMode]);
 
   function onPickStudent(s: PickedStudent | null) {
     setStudent(s);
@@ -395,42 +431,51 @@ function NewPassModal({
 
         {error && <div className="callout callout--danger"><span>{error}</span></div>}
 
-        {/* Тип лица — студент (из Сетевого ПОО) или иное (свободные поля) */}
-        <div className="row" style={{ gap: 0, border: '1px solid var(--ais-line)', borderRadius: 8, padding: 2 }}>
-          <button
-            type="button"
-            onClick={() => switchSubject('student')}
-            className={subject === 'student' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
-            style={{ flex: 1 }}
-          >
-            Студент
+        {studentMode ? (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={fillMyData}
+                  style={{ alignSelf: 'flex-start' }}>
+            Себе
           </button>
-          <button
-            type="button"
-            onClick={() => switchSubject('other')}
-            className={subject === 'other' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
-            style={{ flex: 1 }}
-          >
-            Сотрудник / иное лицо
-          </button>
-        </div>
+        ) : (
+          <>
+            {/* Тип лица — студент (из Сетевого ПОО) или иное (свободные поля) */}
+            <div className="row" style={{ gap: 0, border: '1px solid var(--ais-line)', borderRadius: 8, padding: 2 }}>
+              <button
+                type="button"
+                onClick={() => switchSubject('student')}
+                className={subject === 'student' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
+                style={{ flex: 1 }}
+              >
+                Студент
+              </button>
+              <button
+                type="button"
+                onClick={() => switchSubject('other')}
+                className={subject === 'other' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
+                style={{ flex: 1 }}
+              >
+                Сотрудник / иное лицо
+              </button>
+            </div>
 
-        {subject === 'student' && (
-          <div className="col" style={{ gap: 'var(--s-1)' }}>
-            <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Студент (из Сетевого ПОО)</span>
-            <StudentPicker value={student} onChange={onPickStudent} required />
-          </div>
+            {subject === 'student' && (
+              <div className="col" style={{ gap: 'var(--s-1)' }}>
+                <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Студент (из Сетевого ПОО)</span>
+                <StudentPicker value={student} onChange={onPickStudent} required />
+              </div>
+            )}
+          </>
         )}
 
         <label className="col" style={{ gap: 'var(--s-1)' }}>
           <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>
-            ФИО {subject === 'student' && <span style={{ opacity: 0.6 }}>(подставляется из выбора)</span>}
+            ФИО {!studentMode && subject === 'student' && <span style={{ opacity: 0.6 }}>(подставляется из выбора)</span>}
           </span>
           <input className="input" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </label>
         <label className="col" style={{ gap: 'var(--s-1)' }}>
           <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>
-            {subject === 'student' ? 'Группа' : 'Должность / организация'}
+            {studentMode || subject === 'student' ? 'Группа' : 'Должность / организация'}
           </span>
           <input className="input" required value={groupOrPosition} onChange={(e) => setGroupOrPosition(e.target.value)} />
         </label>

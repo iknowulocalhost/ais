@@ -38,12 +38,28 @@ export class TypeOrmUserRepository implements UserRepository {
     await this.repo.delete({ id });
   }
 
-  async list(limit: number, offset: number): Promise<{ items: User[]; total: number }> {
-    const [rows, total] = await this.repo.findAndCount({
-      take: limit,
-      skip: offset,
-      order: { createdAt: 'DESC' },
-    });
+  async list(
+    limit: number,
+    offset: number,
+    filter?: { search?: string; role?: string },
+  ): Promise<{ items: User[]; total: number }> {
+    const qb = this.repo.createQueryBuilder('u');
+    if (filter?.role) {
+      // Postgres-специфика: `roles` это `enum[]`, проверяем содержание через `=ANY`.
+      qb.andWhere(':role = ANY(u.roles)', { role: filter.role });
+    }
+    if (filter?.search && filter.search.trim().length >= 2) {
+      const q = `%${filter.search.trim()}%`;
+      qb.andWhere(
+        '(u.email ILIKE :q OR u.last_name ILIKE :q OR u.first_name ILIKE :q OR u.middle_name ILIKE :q)',
+        { q },
+      );
+    }
+    const [rows, total] = await qb
+      .orderBy('u.created_at', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
     return { items: rows.map((r) => this.toDomain(r)), total };
   }
 
@@ -62,11 +78,22 @@ export class TypeOrmUserRepository implements UserRepository {
       r.lastLoginAt,
       r.netschoolEmployeeId,
       r.studentExternalId,
+      r.samAccountName,
+      r.maxChatId,
+      r.maxLinkPromptSkipCount,
     );
   }
 
   async findByStudentExternalId(externalId: number): Promise<User | null> {
     const row = await this.repo.findOne({ where: { studentExternalId: externalId } });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async findBySamAccountName(samAccountName: string): Promise<User | null> {
+    const row = await this.repo
+      .createQueryBuilder('u')
+      .where('LOWER(u.sam_account_name) = LOWER(:sam)', { sam: samAccountName })
+      .getOne();
     return row ? this.toDomain(row) : null;
   }
 
@@ -113,6 +140,14 @@ export class TypeOrmUserRepository implements UserRepository {
     row.lastLoginAt = u.lastLoginAt;
     row.netschoolEmployeeId = u.netschoolEmployeeId;
     row.studentExternalId = u.studentExternalId;
+    row.samAccountName = u.samAccountName;
+    row.maxChatId = u.maxChatId;
+    row.maxLinkPromptSkipCount = u.maxLinkPromptSkipCount;
     return row;
+  }
+
+  async findByMaxChatId(chatId: string): Promise<User | null> {
+    const row = await this.repo.findOne({ where: { maxChatId: chatId } });
+    return row ? this.toDomain(row) : null;
   }
 }

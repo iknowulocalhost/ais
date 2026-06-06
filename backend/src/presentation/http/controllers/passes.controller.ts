@@ -38,10 +38,7 @@ import {
 } from '../../../domain/repositories/pass.repository';
 import { Pass } from '../../../domain/entities/pass.entity';
 
-/**
- * Сотрудничьи роли — видят чужие заявки и могут менять статус. Учитель (TEA) попадает
- * сюда: он оформляет пропуска и справки на студентов своей группы.
- */
+/** Роли с доступом ко всем заявкам и сменой статуса (TEA — для своей группы). */
 const STAFF_ROLES: Role[] = [Role.SUPERADMIN, Role.ADM, Role.ADMINISTRATION, Role.COM, Role.TEA];
 
 function isStaff(user: AuthenticatedUser | null): boolean {
@@ -68,10 +65,7 @@ export class PassesController {
     return { id: saved.id, status: saved.status };
   }
 
-  /**
-   * Список заявок. STU видит только свои; STAFF — все. Фильтрация делается на бэке,
-   * чтобы STU физически не мог получить чужие записи через query-parameters.
-   */
+  /** GET /passes — STU видит только свои, STAFF — все. Фильтр на бэке. */
   @Roles(Role.SUPERADMIN, Role.ADM, Role.COM, Role.TEA, Role.STU)
   @Get()
   async list(
@@ -104,11 +98,7 @@ export class PassesController {
     return this.serialize(p);
   }
 
-  /**
-   * Загрузка квитанции студентом (или сотрудником).
-   * STU — только своя заявка и только пока в PENDING.
-   * STAFF — любая заявка, любой статус.
-   */
+  /** Загрузка квитанции. STU — своя+PENDING; STAFF — любую. */
   @Roles(Role.SUPERADMIN, Role.ADM, Role.COM, Role.TEA, Role.STU)
   @Post(':id/ticket-upload')
   async initTicketUpload(

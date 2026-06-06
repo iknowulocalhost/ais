@@ -1,5 +1,14 @@
 import 'reflect-metadata';
+import * as dns from 'dns';
 import { NestFactory } from '@nestjs/core';
+
+// AAAA для poo.zabedu.ru/chtotib.ru у провайдера колледжа отдаёт 100::1 (discard).
+// Принудительно IPv4: dns.lookup + undici (fetch) connect.
+dns.setDefaultResultOrder('ipv4first');
+// undici поставляется встроенно в Node ≥18, types не объявлены — require обходит TS.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { Agent, setGlobalDispatcher } = require('undici');
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';

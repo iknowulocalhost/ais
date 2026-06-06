@@ -55,10 +55,12 @@ export class GradesController {
     @Query('limit') limit = '50',
     @Query('offset') offset = '0',
   ) {
+    const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const off = Math.max(Number(offset) || 0, 0);
     return this.sheets.list(
       { groupId: q.groupId, teacherId: q.teacherId, status: q.status },
-      Number(limit),
-      Number(offset),
+      lim,
+      off,
     );
   }
 

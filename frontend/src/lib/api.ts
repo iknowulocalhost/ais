@@ -1,17 +1,3 @@
-/**
- * HTTP-клиент с автоматической ротацией access-токена.
- *
- * Стратегия:
- *  - `accessToken` держим в памяти модуля (+ зеркалируем в localStorage для восстановления после reload).
- *  - `refreshToken` — в localStorage (MVP). В production-варианте разумнее httpOnly-cookie,
- *    но для этого нужно расширение backend'а (set-cookie на /auth/login), что выходит за рамки этапа.
- *  - 401 на запросе → один раз попробовать `/auth/refresh`, заменить пару токенов и повторить исходный запрос.
- *  - Параллельные 401 сериализуются через единый `refreshPromise`, чтобы не долбить /refresh N раз.
- *
- * NB: при сбое /refresh выкидываем пользователя в /login (через колбэк onAuthFailure, чтобы
- * не завязываться на router здесь).
- */
-
 const ACCESS_KEY = 'ais.access';
 const REFRESH_KEY = 'ais.refresh';
 
@@ -93,7 +79,6 @@ export interface ApiOptions {
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
   headers?: Record<string, string>;
-  /** Отключить авто-refresh — полезно для /auth/login. */
   skipAuth?: boolean;
 }
 

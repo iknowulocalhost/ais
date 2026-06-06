@@ -1,11 +1,13 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsString, Length, MinLength } from 'class-validator';
 
+// email = email или sAMAccountName (LDAP); поэтому не @IsEmail
 export class LoginDto {
-  @IsEmail()
+  @IsString()
+  @Length(1, 320)
   email!: string;
 
   @IsString()
-  @MinLength(1)
+  @Length(1, 256)
   password!: string;
 }
 

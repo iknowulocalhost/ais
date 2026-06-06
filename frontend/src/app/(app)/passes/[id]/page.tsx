@@ -7,6 +7,8 @@ import { ArrowLeft, Upload, Trash2 } from 'lucide-react';
 import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
+import { useAuth } from '@/lib/auth-context';
+import { isStudentOnly } from '@/lib/role-helpers';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 type Hostel = 'NONE' | 'H1' | 'H2' | 'H3';
@@ -40,6 +42,8 @@ export default function PassDetailPage() {
 function PassDetail() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const studentMode = isStudentOnly(user);
   const id = params?.id;
   const [pass, setPass] = useState<Pass | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -200,13 +204,13 @@ function PassDetail() {
       </div>
 
       <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
-        {pass.status !== 'APPROVED' && (
+        {!studentMode && pass.status !== 'APPROVED' && (
           <button onClick={() => decide('APPROVE')} disabled={busy} className="btn btn--primary">Выдать</button>
         )}
-        {pass.status !== 'REJECTED' && (
+        {!studentMode && pass.status !== 'REJECTED' && (
           <button onClick={() => decide('REJECT')} disabled={busy} className="btn btn--danger">Отклонить</button>
         )}
-        {pass.status !== 'PENDING' && (
+        {!studentMode && pass.status !== 'PENDING' && (
           <button onClick={() => decide('RESET')} disabled={busy} className="btn btn--ghost">Вернуть в работу</button>
         )}
         <Link href="/passes" className="btn btn--ghost" style={{ marginLeft: 'auto' }}>К списку</Link>

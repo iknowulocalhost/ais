@@ -52,7 +52,5 @@ export function useTheme() {
   return ctx;
 }
 
-/**
- * Inline-скрипт, выставляющий тему до гидрации, чтобы избежать вспышки.
- */
+/** Inline-скрипт темы до гидрации (anti-flash). */
 export const themeBootstrapScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();`;

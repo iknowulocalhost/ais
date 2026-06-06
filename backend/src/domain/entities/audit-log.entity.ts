@@ -1,8 +1,3 @@
-/**
- * Запись журнала аудита.
- * Хранится в TimescaleDB hypertable (по ts).
- * Требования 152-ФЗ: фиксация субъекта, действия, IP-адреса, состояний ДО/ПОСЛЕ.
- */
 export type AuditAction =
   | 'CREATE'
   | 'UPDATE'
@@ -14,7 +9,9 @@ export type AuditAction =
   | 'ROLE_CHANGE'
   | 'READ_SENSITIVE'
   | 'HTTP_REQUEST'
-  | 'SECURITY_ALERT';
+  | 'SECURITY_ALERT'
+  | 'LINK_MAX_ACCOUNT'
+  | 'UNLINK_MAX_ACCOUNT';
 
 export class AuditLog {
   constructor(

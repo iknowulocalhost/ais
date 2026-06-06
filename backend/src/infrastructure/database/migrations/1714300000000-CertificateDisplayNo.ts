@@ -1,15 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Человекочитаемый номер справки («С-N»).
- *
- * Реализация: отдельная PostgreSQL sequence + колонка `display_no` с дефолтом
- * `nextval(...)`. UUID-первичный ключ остаётся, но в печатные формы и UI выводится
- * именно display_no — оператор видит «С-42» вместо обрезанного UUID.
- *
- * Идемпотентность: создание sequence и колонки обёрнуто в IF NOT EXISTS,
- * чтобы безопасно повторно прогонять на уже инициализированной БД.
- */
+/** certificate_requests.display_no (sequence) — человекочитаемый номер «С-N». */
 export class CertificateDisplayNo1714300000000 implements MigrationInterface {
   name = 'CertificateDisplayNo1714300000000';
 

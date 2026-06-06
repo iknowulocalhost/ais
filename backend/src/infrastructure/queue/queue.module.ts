@@ -5,6 +5,7 @@ import { QUEUES } from './queue.constants';
 import { AvatarProcessor } from './processors/avatar.processor';
 import { ReportExportProcessor } from './processors/report-export.processor';
 import { PoozabeduSyncProcessor } from './processors/poozabedu-sync.processor';
+import { MaxOutboxPurgeProcessor } from './processors/max-outbox-purge.processor';
 import { SyncPoozabeduUseCase } from '../../application/use-cases/poozabedu/sync-poozabedu.use-case';
 import { AuditService } from '../../application/services/audit.service';
 
@@ -27,12 +28,14 @@ import { AuditService } from '../../application/services/audit.service';
       { name: QUEUES.REPORT_EXPORT },
       { name: QUEUES.NOTIFICATIONS },
       { name: QUEUES.POOZABEDU_SYNC },
+      { name: QUEUES.MAX_OUTBOX_PURGE },
     ),
   ],
   providers: [
     AvatarProcessor,
     ReportExportProcessor,
     PoozabeduSyncProcessor,
+    MaxOutboxPurgeProcessor,
     SyncPoozabeduUseCase,
     AuditService,
   ],

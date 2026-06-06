@@ -5,9 +5,7 @@ import { ListCertificatesUseCase } from '../../application/use-cases/certificate
 import { SetCertificateStatusUseCase } from '../../application/use-cases/certificates/set-certificate-status.use-case';
 import { UpdateCertificateDativeUseCase } from '../../application/use-cases/certificates/update-certificate-dative.use-case';
 import { AuditService } from '../../application/services/audit.service';
-import { MaxBotService } from '../../application/services/max-bot.service';
 import { DativeNameService } from '../../application/services/dative-name.service';
-import { MAX_BOT_NOTIFIER } from '../../domain/services/max-bot-notifier';
 
 @Module({
   controllers: [CertificatesController],
@@ -17,9 +15,7 @@ import { MAX_BOT_NOTIFIER } from '../../domain/services/max-bot-notifier';
     SetCertificateStatusUseCase,
     UpdateCertificateDativeUseCase,
     AuditService,
-    MaxBotService,
     DativeNameService,
-    { provide: MAX_BOT_NOTIFIER, useExisting: MaxBotService },
   ],
 })
 export class CertificatesModule {}

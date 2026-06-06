@@ -14,8 +14,15 @@ import {
   REFRESH_TOKEN_STORE,
   RefreshTokenStore,
 } from '../../../domain/services/refresh-token-store';
+import {
+  POOZABEDU_STUDENT_REPOSITORY,
+  PoozabeduStudentRepository,
+} from '../../../domain/repositories/poozabedu-mirror.repository';
 import { Role } from '../../../domain/enums/role.enum';
 import { AuditService, AuditContext } from '../../services/audit.service';
+import { Logger } from '@nestjs/common';
+import { LdapLoginUseCase } from './ldap-login.use-case';
+import { User } from '../../../domain/entities/user.entity';
 
 export interface JwtAccessPayload {
   sub: string;
@@ -50,33 +57,79 @@ export interface LoginResult {
 
 @Injectable()
 export class LoginUseCase {
+  private readonly logger = new Logger(LoginUseCase.name);
+
   constructor(
     @Inject(USER_REPOSITORY) private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     @Inject(REFRESH_TOKEN_STORE) private readonly refreshStore: RefreshTokenStore,
+    @Inject(POOZABEDU_STUDENT_REPOSITORY)
+    private readonly mirrorStudents: PoozabeduStudentRepository,
+    private readonly ldap: LdapLoginUseCase,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
     private readonly audit: AuditService,
   ) {}
 
-  async execute(email: string, password: string, ctx: AuditContext): Promise<LoginResult> {
-    const user = await this.users.findByEmail(email.toLowerCase().trim());
+  async execute(login: string, password: string, ctx: AuditContext): Promise<LoginResult> {
+    // Решаем, как трактовать введённый «логин»:
+    //  - есть '@' → email, идём в локальную авторизацию;
+    //  - нет '@' → доменный sAMAccountName, идём в LDAP (если включён).
+    // На случай если LDAP-учётке завели локальный email — после LDAP-фейла
+    // упадём обратно в локальную ветку.
+    const trimmed = login.trim();
+    const looksLikeSam = !trimmed.includes('@');
+    let user: User | null = null;
+    let via: 'local' | 'ldap' = 'local';
 
-    // Timing-attack mitigation: сверяем хеш даже если пользователя нет.
-    const hashToVerify =
-      user?.passwordHash ??
-      '$argon2id$v=19$m=19456,t=2,p=1$ZmFrZXNhbHRmYWtlc2FsdA$fakehashfakehashfakehashfakehashfakehashfake';
-    const valid = await this.hasher.verify(hashToVerify, password);
+    if (looksLikeSam && this.ldap.isEnabled()) {
+      const profile = await this.ldap.tryAuthenticate(trimmed, password);
+      if (profile) {
+        user = await this.ldap.upsertFromLdap(profile);
+        via = 'ldap';
+      }
+    }
 
-    if (!user || !valid || !user.isActive) {
+    // Fallback: либо ввели email, либо LDAP не сработал.
+    if (!user) {
+      const candidate = await this.users.findByEmail(trimmed.toLowerCase());
+
+      // Timing-attack mitigation: сверяем хеш даже если пользователя нет.
+      const hashToVerify =
+        candidate?.passwordHash ??
+        '$argon2id$v=19$m=19456,t=2,p=1$ZmFrZXNhbHRmYWtlc2FsdA$fakehashfakehashfakehashfakehashfakehashfake';
+      const valid = await this.hasher.verify(hashToVerify, password);
+      if (candidate && valid && candidate.isActive) {
+        user = candidate;
+      } else {
+        // Аудит-причина намеренно одна и та же для всех негативных исходов
+        // («нет пользователя», «неверный пароль», «деактивирован»). Иначе
+        // админ или взломщик, читающий audit_log, смог бы по reason понять,
+        // что логин подобран верно — это сильно облегчает брутфорс.
+        // Деактивацию учётки фиксируем отдельно, после успешной проверки пароля.
+        await this.audit.record({
+          ctx,
+          action: 'LOGIN_FAILED',
+          entity: 'User',
+          entityId: null,
+          meta: { login: trimmed.toLowerCase(), looksLikeSam },
+        });
+        throw new UnauthorizedException('Неверный логин или пароль');
+      }
+    }
+
+    if (!user.isActive) {
+      // Здесь пароль уже проверен корректно — поэтому отдельное событие,
+      // чтобы админ видел: «вот человек с правильным паролем пытается войти,
+      // но его аккаунт отключён». Это уже не утечка — логин подтверждён.
       await this.audit.record({
         ctx,
         action: 'LOGIN_FAILED',
         entity: 'User',
-        entityId: user?.id ?? null,
-        meta: { email: email.toLowerCase().trim(), reason: !user ? 'not_found' : !valid ? 'bad_password' : 'inactive' },
+        entityId: user.id,
+        meta: { reason: 'inactive' },
       });
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new UnauthorizedException('Учётная запись отключена');
     }
 
     const accessToken = await this.jwt.signAsync(
@@ -104,6 +157,37 @@ export class LoginUseCase {
 
     await this.refreshStore.save(user.id, jti, refreshToken, parseTtlToSeconds(refreshTtl));
 
+    // Авто-привязка STU-аккаунта к студенту из зеркала Сетевого ПОО.
+    // Срабатывает, если аккаунт создан вручную через /admin/users/new (без
+    // явной привязки), но ФИО совпадает с одним конкретным студентом в зеркале.
+    // Если совпадений несколько (полные тёзки) — оставляем `null`, админ
+    // привяжет руками. Любая ошибка глотается — логин не должен падать из-за
+    // вспомогательной операции.
+    if (
+      user.roles.includes(Role.STU) &&
+      user.studentExternalId === null
+    ) {
+      try {
+        const candidates = await this.mirrorStudents.findByFullName(
+          user.lastName,
+          user.firstName,
+          user.middleName,
+        );
+        if (candidates.length === 1) {
+          user.studentExternalId = candidates[0].externalId;
+          this.logger.log(
+            `auto-link STU ${user.id} → poozabedu student #${candidates[0].externalId} (${user.lastName} ${user.firstName})`,
+          );
+        } else if (candidates.length > 1) {
+          this.logger.warn(
+            `auto-link skipped: ${candidates.length} однофамильцев для ${user.lastName} ${user.firstName}`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn(`auto-link error: ${(e as Error).message}`);
+      }
+    }
+
     user.recordLogin();
     await this.users.update(user);
 
@@ -112,7 +196,7 @@ export class LoginUseCase {
       action: 'LOGIN',
       entity: 'User',
       entityId: user.id,
-      meta: { jti },
+      meta: { jti, via },
     });
 
     return {

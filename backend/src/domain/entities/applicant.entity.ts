@@ -1,7 +1,3 @@
-/**
- * Абитуриент — карточка с персональными данными, заполняется приёмной комиссией.
- * Все ПДн хранятся в зашифрованном виде (см. ApplicantCipherService).
- */
 export type ApplicantStatus = 'DRAFT' | 'SUBMITTED' | 'ENROLLED' | 'REJECTED';
 
 /* ── Паспорт ── */

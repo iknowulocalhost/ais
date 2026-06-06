@@ -1,29 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  AlertTriangle, BookOpen, CalendarDays, FileText, GraduationCap, KeyRound, RefreshCw, UsersRound,
+  BookOpen, CalendarDays, BarChart3, FileText, KeyRound, ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
-
-/**
- * Сводка для классного руководителя.
- *
- * Лёгкая часть (всегда грузится):
- *  - его группа(ы) из зеркала + количество студентов;
- *  - быстрые ссылки на /my-group, /journal, /schedule.
- *
- * Тяжёлая часть (по кнопке «Анализ за 2 недели»):
- *  - подсчёт «должников» (≥1 «двойки» за последние 14 дней по любому предмету);
- *  - кто отсутствовал/болел сегодня по любым проведённым урокам.
- *
- * Тяжёлая часть делает много upstream-запросов (по числу предметов в группе).
- * Поэтому она опциональна и запускается только по явному действию.
- */
+import {
+  readDashboardCache, writeDashboardCache, isDashboardCacheStale,
+} from '@/lib/dashboard-cache';
 
 interface MirrorGroup {
   externalId: number;
@@ -38,582 +26,714 @@ interface MirrorStudent {
   middleName: string | null;
   groupExternalId: number | null;
   groupName: string | null;
-  gradePointAverage: number | null;
   isActive: boolean;
 }
-interface JournalEntry {
-  id: number;
-  yearNumber: number;
-  termNumber: number;
-  isActive: boolean;
-  startDate: string;
-  endDate: string;
-  scheduleSubjects: { id: number; name: string }[];
-}
-interface SubjectLesson {
-  id: number;
-  date: string;
-  type: string;
-  startTime?: string;
-  endTime?: string;
-  markSets?: Record<string, {
-    absenceType?: string;
-    marks?: Record<string, unknown>;
-  }>;
-}
-interface SubjectStudent {
-  id: number;
-  number?: number;
-  firstName?: string;
-  lastName?: string;
-  middleName?: string;
-}
-interface SubjectData {
-  lessons: SubjectLesson[];
-  students: SubjectStudent[];
+
+interface ChtotibGroupLesson { period: number; subject: string; teacher: string; room: string }
+interface ChtotibTeacherLesson { period: number; groupOrSubject: string; detail: string; room: string }
+interface ChtotibTodayResponse {
+  snapshot: { scheduleDate: string; fetchedAt: string };
+  sections: Array<
+    | { kind: 'group'; groupName: string; lessons: ChtotibGroupLesson[] }
+    | { kind: 'teacher'; teacherName: string; lessons: ChtotibTeacherLesson[] }
+  >;
 }
 
-interface RequestRow {
-  id: string;
-  fullName: string;
-  groupName: string;
-  createdAt: string;
-  /** Только для справок — тип. Для пропусков отсутствует. */
-  certType?: string;
+interface GroupDebtRow {
+  studentExternalId: number;
+  lastName: string;
+  firstName: string;
+  middleName: string | null;
+  count: number;
+  subjects: string[];
 }
-
-interface DebtorRow {
-  studentName: string;
-  groupName: string;
-  twos: { subject: string; date: string }[];
+interface GroupDebtsResponse {
+  groupExternalId: number;
+  term: number;
+  year: number;
+  rows: GroupDebtRow[];
 }
-interface AbsenceRow {
-  studentName: string;
-  groupName: string;
-  status: 'absent' | 'sick' | 'late' | 'excused' | 'other';
-  subject: string;
-  raw: string;
-}
-
-const TWO_VALUES = new Set(['Two', 'One', 'Zero', 'Unsatisfactory']);
-const SICK_TYPES = new Set(['Sick', 'IsSick', 'SickLeave', 'Sickness']);
-const LATE_TYPES = new Set(['IsLate']);
-const EXCUSED_TYPES = new Set(['IsAbsentByValidReason', 'Excused']);
-const ABSENT_TYPES = new Set(['IsAbsentByNotValidReason', 'IsAbsent']);
 
 export function TeacherDashboard() {
   const { user } = useAuth();
-  const [groups, setGroups] = useState<MirrorGroup[] | null>(null);
-  const [students, setStudents] = useState<MirrorStudent[] | null>(null);
-  const [pendingCerts, setPendingCerts] = useState<RequestRow[]>([]);
-  const [pendingPasses, setPendingPasses] = useState<RequestRow[]>([]);
-  const [now] = useState<Date>(() => new Date());
-  const [analysis, setAnalysis] = useState<{ debtors: DebtorRow[]; absences: AbsenceRow[] } | null>(null);
-  const [analysisBusy, setAnalysisBusy] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const now = useMemo(() => new Date(), []);
+  const dateLabel = useMemo(() => formatDateMono(now), [now]);
+  const greeting = useMemo(() => byHour(now.getHours()), [now]);
 
-  // Базовые данные: группы + полный список студентов
+  type Snapshot = {
+    groups: MirrorGroup[];
+    students: MirrorStudent[];
+    today: ChtotibTodayResponse | null;
+    debts: GroupDebtsResponse | null;
+  };
+  const cacheKey = `teacher-dashboard:${user?.id ?? 'anon'}`;
+  const cached = useMemo(() => readDashboardCache<Snapshot>(cacheKey), [cacheKey]);
+
+  const [groups, setGroups] = useState<MirrorGroup[]>(cached?.groups ?? []);
+  const [students, setStudents] = useState<MirrorStudent[]>(cached?.students ?? []);
+  const [today, setToday] = useState<ChtotibTodayResponse | null>(cached?.today ?? null);
+  const [debts, setDebts] = useState<GroupDebtsResponse | null>(cached?.debts ?? null);
+  const [scheduleTab, setScheduleTab] = useState<'mine' | 'group'>('mine');
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<boolean>(!!cached);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
   useEffect(() => {
+    let cancelled = false;
+    if (cached && !isDashboardCacheStale(cacheKey)) return;
+    setRefreshing(!!cached);
     (async () => {
       try {
-        const g = await apiFetch<MirrorGroup[]>('/api/poozabeduapi/mirror/groups');
-        const active = g.filter((x) => x.isActive);
-        setGroups(active);
-        // подгружаем студентов всех своих групп одним запросом без groupExternalId —
-        // бэк сам отфильтрует по нашей привязке (TEA видит только свои)
-        const s = await apiFetch<{ items: MirrorStudent[] }>('/api/poozabeduapi/mirror/students', {
-          query: { isActive: 'true', limit: 500 },
-        });
-        setStudents(s.items);
-        // Заявки в работе по студентам моих групп. Бэк не умеет фильтровать
-        // по группе напрямую, поэтому просто подтягиваем последние PENDING
-        // и фильтруем на клиенте по списку групп.
-        const groupNames = new Set(active.map((x) => x.name));
-        const [certs, passes] = await Promise.all([
-          apiFetch<{ items: (RequestRow & { status: string; certType: string })[] }>(
-            '/api/certificates',
-            { query: { status: 'PENDING', limit: 100 } },
-          ).catch(() => ({ items: [] as (RequestRow & { status: string; certType: string })[] })),
-          apiFetch<{ items: (RequestRow & { status: string; groupOrPosition?: string })[] }>(
-            '/api/passes',
-            { query: { status: 'PENDING', limit: 100 } },
-          ).catch(() => ({ items: [] as (RequestRow & { status: string; groupOrPosition?: string })[] })),
+        const gs = await apiFetch<MirrorGroup[]>('/api/poozabeduapi/mirror/groups').catch(() => []);
+        const active = (Array.isArray(gs) ? gs : []).filter((g) => g.isActive);
+        let nextStudents = students;
+        let nextToday = today;
+        let nextDebts = debts;
+        if (!cancelled) setGroups(active);
+        const myGroup = active[0];
+        await Promise.all([
+          apiFetch<{ items: MirrorStudent[] }>('/api/poozabeduapi/mirror/students', {
+            query: { isActive: 'true', limit: 500 },
+          })
+            .then((r) => { nextStudents = r.items; if (!cancelled) setStudents(r.items); })
+            .catch(() => {}),
+          apiFetch<ChtotibTodayResponse>('/api/chtotib/today')
+            .then((d) => { nextToday = d; if (!cancelled) setToday(d); })
+            .catch(() => {}),
+          myGroup
+            ? apiFetch<GroupDebtsResponse>(`/api/poozabeduapi/groups/${myGroup.externalId}/debts`)
+                .then((d) => { nextDebts = d; if (!cancelled) setDebts(d); })
+                .catch(() => {})
+            : Promise.resolve(),
         ]);
-        setPendingCerts(certs.items.filter((c) => groupNames.has(c.groupName)));
-        setPendingPasses(
-          passes.items
-            .filter((p) => groupNames.has(p.groupOrPosition ?? p.groupName))
-            .map((p) => ({ ...p, groupName: p.groupOrPosition ?? p.groupName })),
-        );
-      } catch (e) {
-        setError(explainError(e).hint);
-      }
-    })();
-  }, []);
-
-  const greeting = useMemo(() => byHour(now.getHours()), [now]);
-  const dateLabel = useMemo(() => formatDate(now), [now]);
-
-  const runAnalysis = useCallback(async () => {
-    if (!groups || !students) return;
-    setAnalysisBusy(true);
-    setError(null);
-    setAnalysis(null);
-    const debtorsByStudent = new Map<string, DebtorRow>();
-    const absences: AbsenceRow[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 3600 * 1000);
-    const todayIso = isoDate(today);
-
-    try {
-      let processed = 0;
-      let totalSubjects = 0;
-      // 1) Тянем семестры по каждой группе, считаем сколько предметов
-      const subjectsToFetch: { gradebookId: number; subjectId: number; subjectName: string; groupName: string }[] = [];
-      for (const g of groups) {
-        const entries = await apiFetch<JournalEntry[]>(
-          `/api/poozabeduapi/journal/groups/${g.externalId}/entries`,
-        );
-        const activeTerm = entries.find((e) => e.isActive) ?? entries[entries.length - 1];
-        if (!activeTerm) continue;
-        for (const subj of activeTerm.scheduleSubjects) {
-          subjectsToFetch.push({
-            gradebookId: activeTerm.id,
-            subjectId: subj.id,
-            subjectName: subj.name,
-            groupName: g.name,
+        if (!cancelled) {
+          writeDashboardCache<Snapshot>(cacheKey, {
+            groups: active, students: nextStudents, today: nextToday, debts: nextDebts,
           });
         }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof ApiError ? e.message : explainError(e).hint);
+      } finally {
+        if (!cancelled) { setLoaded(true); setRefreshing(false); }
       }
-      totalSubjects = subjectsToFetch.length;
-      // 2) По каждому предмету тянем журнал и собираем двойки/отсутствия
-      for (const t of subjectsToFetch) {
-        processed++;
-        setAnalysisProgress(`${processed} / ${totalSubjects} · ${t.subjectName.slice(0, 40)}`);
-        try {
-          const subj = await apiFetch<SubjectData>(
-            `/api/poozabeduapi/journal/gradebooks/${t.gradebookId}/subjects/${t.subjectId}`,
-          );
-          const sIndex = new Map<number, SubjectStudent>();
-          for (const s of subj.students) sIndex.set(s.id, s);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
-          for (const lesson of subj.lessons) {
-            const lessonDate = lesson.date.slice(0, 10);
-            const lessonDateObj = parseISO(lessonDate);
-            if (!lessonDateObj) continue;
-            const inWindow = lessonDateObj >= twoWeeksAgo && lessonDateObj <= today;
-            const isToday = lessonDate === todayIso;
+  const myGroup = groups[0] ?? null;
+  const myGroupStudents = students.filter((s) => myGroup && s.groupExternalId === myGroup.externalId);
 
-            const cells = lesson.markSets ?? {};
-            for (const [studentIdStr, cell] of Object.entries(cells)) {
-              const sid = Number(studentIdStr);
-              const ssub = sIndex.get(sid);
-              if (!ssub) continue;
-              const studentName = `${ssub.lastName ?? ''} ${ssub.firstName ?? ''} ${ssub.middleName ?? ''}`.trim();
+  const groupSchedule = (today?.sections.find((s) => s.kind === 'group') ?? null) as
+    | { kind: 'group'; groupName: string; lessons: ChtotibGroupLesson[] }
+    | null;
+  const teacherSchedule = (today?.sections.find((s) => s.kind === 'teacher') ?? null) as
+    | { kind: 'teacher'; teacherName: string; lessons: ChtotibTeacherLesson[] }
+    | null;
 
-              // Двойки за окно 14 дней
-              if (inWindow && cell.marks) {
-                const hasTwo = Object.values(cell.marks).some((v) => isTwo(v));
-                if (hasTwo) {
-                  const key = `${t.groupName}/${studentName}`;
-                  const row = debtorsByStudent.get(key) ?? {
-                    studentName, groupName: t.groupName, twos: [],
-                  };
-                  row.twos.push({ subject: t.subjectName, date: lessonDate });
-                  debtorsByStudent.set(key, row);
-                }
-              }
+  const activeLessons = scheduleTab === 'mine'
+    ? (teacherSchedule?.lessons ?? [])
+    : (groupSchedule?.lessons ?? []);
 
-              // Отсутствие сегодня
-              if (isToday && cell.absenceType) {
-                absences.push({
-                  studentName,
-                  groupName: t.groupName,
-                  status: classifyAbsence(cell.absenceType),
-                  subject: t.subjectName,
-                  raw: cell.absenceType,
-                });
-              }
-            }
-          }
-        } catch {
-          // одиночный сбой не валит весь анализ
-        }
-      }
+  const currentPeriod = computeCurrentPeriod(now);
 
-      const debtors = Array.from(debtorsByStudent.values())
-        .sort((a, b) => b.twos.length - a.twos.length);
-      setAnalysis({ debtors, absences });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : explainError(e).hint);
-    } finally {
-      setAnalysisBusy(false);
-      setAnalysisProgress('');
-    }
-  }, [groups, students]);
+  const debtsTotal = debts?.rows.reduce((acc, r) => acc + r.count, 0) ?? 0;
+  const debtsStudents = debts?.rows.length ?? 0;
 
   return (
-    <div className="col" style={{ gap: 'var(--s-7)' }}>
+    <div className="col" style={{ gap: 'var(--s-5)' }}>
+      {error && <div className="callout callout--danger"><span>{error}</span></div>}
+
+      {/* ────────── HERO ────────── */}
       <motion.section
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
+        transition={{ duration: 0.42 }}
         className="row"
-        style={{
-          justifyContent: 'space-between', alignItems: 'flex-end',
-          gap: 'var(--s-6)', borderBottom: '1px solid var(--ais-line)', paddingBottom: 'var(--s-6)',
-        }}
+        style={{ justifyContent: 'space-between', alignItems: 'flex-end', gap: 'var(--s-5)', flexWrap: 'wrap' }}
       >
         <div className="col" style={{ gap: 'var(--s-2)' }}>
-          <div className="mono" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-            {dateLabel}
+          <div className="row" style={{ gap: 'var(--s-2)', alignItems: 'center' }}>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ais-bone-4)' }}>
+              {dateLabel}
+            </div>
+            {refreshing && <RefreshDot title="Обновляем данные…" />}
           </div>
-          <h1 className="display" style={{ fontSize: 'clamp(36px, 4vw, 52px)', lineHeight: 1.05 }}>
-            <span className="muted">{greeting},</span>{' '}
-            <span>{user?.firstName ?? '…'}</span>
+          <h1 className="display" style={{ fontSize: 'clamp(28px, 4vw, 52px)', lineHeight: 1.05, margin: 0 }}>
+            {greeting},{' '}
+            <em style={{ color: 'var(--ais-forest)', fontStyle: 'italic', fontWeight: 600 }}>
+              {user?.firstName ?? '…'}
+            </em>.
           </h1>
+          <div className="muted" style={{ fontSize: 'var(--fs-13)' }}>
+            {myGroup
+              ? <>Группа <b style={{ color: 'var(--ais-bone)' }}>{myGroup.name}</b>{myGroup.yearNumber !== null && ` · ${myGroup.yearNumber} курс`} · {myGroupStudents.length} {pluralize(myGroupStudents.length, ['студент', 'студента', 'студентов'])}</>
+              : 'У вас пока нет закреплённой группы'}
+          </div>
         </div>
-        <div className="col" style={{ gap: 4, alignItems: 'flex-end' }}>
-          <span className="mono" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ais-bone-4)' }}>
-            Закреплено групп
-          </span>
-          <span className="display tnum" style={{ fontSize: 'var(--fs-48)', lineHeight: 1 }}>
-            {groups?.length ?? '—'}
-          </span>
+
+        <div className="row" style={{ gap: 'var(--s-6)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <HeroCounter label="Студентов" value={String(myGroupStudents.length)} tone="bone" />
+          <HeroCounter label="С долгами" value={String(debtsStudents)} tone={debtsStudents > 0 ? 'ember' : 'bone'} />
+          <HeroCounter label="Пар сегодня" value={String(activeLessonsCount(today, scheduleTab))} tone="forest" />
         </div>
       </motion.section>
 
-      {error && <div className="callout callout--danger"><span>{error}</span></div>}
+      {/* ────────── 3-COLUMN BODY ────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr)',
+          gap: 'var(--s-3)',
+          alignItems: 'stretch',
+        }}
+        className="dashboard-grid"
+      >
+        {/* ── Левая: «Состав группы» ── */}
+        <section className="card col" style={{ padding: 'var(--s-5)', gap: 'var(--s-4)', minHeight: 360 }}>
+          <header className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ais-bone-3)' }}>
+              Состав группы
+            </div>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ais-bone-4)' }}>
+              {myGroup?.name ?? '—'}
+            </div>
+          </header>
 
-      {/* Карточки групп */}
-      {groups && groups.length > 0 && (
-        <section className="col" style={{ gap: 'var(--s-3)' }}>
-          <h2 className="display" style={{ fontSize: 'var(--fs-22)', margin: 0 }}>Мои группы</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--s-3)' }}>
-            {groups.map((g) => {
-              const inGroup = students?.filter((s) => s.groupExternalId === g.externalId) ?? [];
-              return (
-                <Link
-                  key={g.externalId}
-                  href="/my-group"
-                  className="card col"
-                  style={{ padding: 'var(--s-4)', gap: 'var(--s-2)', textDecoration: 'none', color: 'inherit' }}
-                >
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 'var(--fs-16)', fontWeight: 600 }}>{g.name}</span>
-                    {g.yearNumber !== null && (
-                      <span className="mono muted" style={{ fontSize: 11 }}>{g.yearNumber} курс</span>
-                    )}
-                  </div>
-                  <div className="row" style={{ gap: 'var(--s-3)', alignItems: 'baseline' }}>
-                    <span className="display tnum" style={{ fontSize: 'var(--fs-28)' }}>{inGroup.length}</span>
-                    <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>{pluralizeStudents(inGroup.length)}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          {!loaded ? (
+            <>
+              <Skeleton width={120} height={56} />
+              <div className="initials-grid" style={{ marginTop: 'var(--s-2)' }}>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <Skeleton key={i} height={32} radius="var(--r-6)" />
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="row" style={{ alignItems: 'baseline', gap: 'var(--s-2)' }}>
+                <span className="display tnum" style={{ fontSize: 'var(--fs-64)', lineHeight: 1, fontWeight: 600 }}>
+                  {myGroupStudents.length}
+                </span>
+                <span className="display" style={{ fontStyle: 'italic', fontSize: 'var(--fs-15)', color: 'var(--ais-bone-3)' }}>
+                  {pluralize(myGroupStudents.length, ['студент', 'студента', 'студентов'])}
+                </span>
+              </div>
+              <div className="initials-grid">
+                {myGroupStudents.map((s) => (
+                  <span key={s.externalId} className="initial-chip" title={`${s.lastName} ${s.firstName}`}>
+                    {(s.lastName[0] ?? '').toUpperCase()}{(s.firstName[0] ?? '').toUpperCase()}
+                  </span>
+                ))}
+                {myGroupStudents.length === 0 && (
+                  <span className="muted" style={{ fontSize: 'var(--fs-13)' }}>Состав группы пуст.</span>
+                )}
+              </div>
+            </>
+          )}
+
+          <footer style={{ marginTop: 'auto', borderTop: '1px solid var(--ais-line)', paddingTop: 'var(--s-3)' }}>
+            <Link
+              href="/my-group"
+              className="row mono"
+              style={{
+                gap: 6, alignItems: 'center', fontSize: 10,
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: 'var(--ais-bone-3)', textDecoration: 'none',
+              }}
+            >
+              Перейти к досье группы
+              <ArrowRight size={12} strokeWidth={1.75} />
+            </Link>
+          </footer>
         </section>
-      )}
 
-      {/* Анализ за 2 недели — по кнопке, тяжёлая операция */}
-      <section className="col" style={{ gap: 'var(--s-3)' }}>
-        <header className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--s-2)' }}>
-          <div className="col" style={{ gap: 4 }}>
-            <h2 className="display" style={{ fontSize: 'var(--fs-22)', margin: 0 }}>Успеваемость и посещаемость</h2>
-            <p className="muted" style={{ margin: 0, fontSize: 'var(--fs-12)', maxWidth: 600 }}>
-              Сводка по группе за последние две недели: студенты с неудовлетворительными оценками
-              и сегодняшние пропуски. Подготовка занимает до минуты.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
-            onClick={() => void runAnalysis()}
-            disabled={analysisBusy || !groups || !students}
-          >
-            <RefreshCw size={14} strokeWidth={1.75} className={analysisBusy ? 'spin' : ''} />
-            {analysisBusy ? 'Анализируем…' : analysis ? 'Обновить' : 'Сформировать сводку'}
-          </button>
-        </header>
-        {analysisBusy && (
-          <div className="muted" style={{ fontSize: 'var(--fs-12)' }}>Обрабатываем: {analysisProgress}</div>
-        )}
+        {/* ── Центр: «Расписание · сегодня» ── */}
+        <section className="card col" style={{ padding: 'var(--s-5)', gap: 'var(--s-4)', minHeight: 360 }}>
+          <header className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ais-bone-3)' }}>
+              Расписание · сегодня
+            </div>
+            <div className="row" style={{ gap: 0, border: '1px solid var(--ais-line)', borderRadius: 'var(--r-pill)', padding: 2 }}>
+              <button
+                type="button"
+                onClick={() => setScheduleTab('mine')}
+                className={scheduleTab === 'mine' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
+                style={{ borderRadius: 'var(--r-pill)' }}
+              >
+                Моё
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleTab('group')}
+                className={scheduleTab === 'group' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm'}
+                style={{ borderRadius: 'var(--r-pill)' }}
+              >
+                Группы
+              </button>
+            </div>
+          </header>
 
-        {analysis && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--s-3)' }}>
-            <DebtorsCard rows={analysis.debtors} />
-            <AbsencesCard rows={analysis.absences} />
-          </div>
-        )}
+          {!loaded ? (
+            <div className="col" style={{ gap: 'var(--s-3)', flex: 1 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="row" style={{ gap: 'var(--s-3)', alignItems: 'flex-start' }}>
+                  <Skeleton width={48} height={28} />
+                  <Skeleton width={8} height={8} radius="50%" style={{ marginTop: 6 }} />
+                  <div className="col" style={{ flex: 1, gap: 4 }}>
+                    <Skeleton width="80%" height={16} />
+                    <Skeleton width="40%" height={11} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : activeLessons.length === 0 ? (
+            <div className="muted" style={{ fontSize: 'var(--fs-13)', flex: 1 }}>
+              {scheduleTab === 'mine' ? 'Сегодня у вас пар нет.' : 'У группы сегодня пар нет.'}
+            </div>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-3)' }}>
+              {activeLessons.map((l, i) => {
+                const isCurrent = l.period === currentPeriod;
+                const periodTimes = PERIOD_TIMES[l.period - 1] ?? ['—', '—'];
+                if (scheduleTab === 'mine') {
+                  const lt = l as ChtotibTeacherLesson;
+                  return (
+                    <LessonRow
+                      key={`m-${i}`}
+                      isCurrent={isCurrent}
+                      times={periodTimes}
+                      title={lt.groupOrSubject || '—'}
+                      meta={`${lt.room ? `АУД. ${lt.room}` : 'без аудитории'} · ${lt.detail || '—'}`}
+                    />
+                  );
+                }
+                const lg = l as ChtotibGroupLesson;
+                return (
+                  <LessonRow
+                    key={`g-${i}`}
+                    isCurrent={isCurrent}
+                    times={periodTimes}
+                    title={lg.subject || '—'}
+                    meta={`${lg.room ? `АУД. ${lg.room}` : 'без аудитории'} · ${groupSchedule?.groupName ?? ''}`}
+                  />
+                );
+              })}
+            </ul>
+          )}
+
+          <footer className="muted mono" style={{ borderTop: '1px solid var(--ais-line)', paddingTop: 'var(--s-3)', marginTop: 'auto', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            {activeLessons.length} {pluralize(activeLessons.length, ['пара', 'пары', 'пар'])}
+            {currentPeriod && activeLessons.some((l) => l.period === currentPeriod) && ` · идёт ${currentPeriod}-я`}
+          </footer>
+        </section>
+
+        {/* ── Правая: «Долги студентов» ── */}
+        <section className="card col" style={{ padding: 'var(--s-5)', gap: 'var(--s-3)', minHeight: 360 }}>
+          <header className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ais-bone-3)' }}>
+              Долги студентов
+            </div>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ais-bone-4)' }}>
+              {debtsTotal} всего
+            </div>
+          </header>
+
+          {!loaded ? (
+            <div className="col" style={{ gap: 'var(--s-3)', flex: 1 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="row" style={{ gap: 'var(--s-3)', alignItems: 'flex-start' }}>
+                  <Skeleton width={32} height={32} radius="var(--r-6)" />
+                  <div className="col" style={{ flex: 1, gap: 4 }}>
+                    <Skeleton width="60%" height={14} />
+                    <Skeleton width="80%" height={11} />
+                  </div>
+                  <Skeleton width={20} height={24} />
+                </div>
+              ))}
+            </div>
+          ) : !debts || debts.rows.length === 0 ? (
+            <div className="muted" style={{ fontSize: 'var(--fs-13)', flex: 1 }}>
+              По текущему семестру несдач нет.
+            </div>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-3)', flex: 1 }}>
+              {debts.rows.slice(0, 6).map((r) => (
+                <DebtRow key={r.studentExternalId} item={r} />
+              ))}
+            </ul>
+          )}
+
+          {debts && debts.rows.length > 6 && (
+            <footer style={{ borderTop: '1px solid var(--ais-line)', paddingTop: 'var(--s-3)', marginTop: 'auto' }}>
+              <Link
+                href="/reports"
+                className="row mono"
+                style={{
+                  gap: 6, alignItems: 'center', fontSize: 10,
+                  letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color: 'var(--ais-bone-3)', textDecoration: 'none',
+                }}
+              >
+                Ещё {debts.rows.length - 6} студентов · открыть ведомость
+                <ArrowRight size={12} strokeWidth={1.75} />
+              </Link>
+            </footer>
+          )}
+        </section>
+      </div>
+
+      {/* ────────── QUICK ACTIONS ────────── */}
+      <section
+        className="quick-row"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+          gap: 'var(--s-3)',
+        }}
+      >
+        <QuickCard
+          icon={<BookOpen size={18} strokeWidth={1.75} />}
+          title="Журнал группы"
+          subtitle="оценки · посещаемость"
+          href="/journal"
+          accent
+        />
+        <QuickCard
+          icon={<CalendarDays size={18} strokeWidth={1.75} />}
+          title="Расписание · неделя"
+          subtitle="моё и группы"
+          href="/schedule"
+        />
+        <QuickCard
+          icon={<BarChart3 size={18} strokeWidth={1.75} />}
+          title="Ведомости и отчёты"
+          subtitle="формирование · экспорт"
+          href="/reports"
+        />
+        <QuickCard
+          icon={<FileText size={18} strokeWidth={1.75} />}
+          title="Заказать справку"
+          subtitle="для студента · для себя"
+          href="/certificates"
+        />
+        <QuickCard
+          icon={<KeyRound size={18} strokeWidth={1.75} />}
+          title="Заказать пропуск"
+          subtitle="болезнь · отгул"
+          href="/passes"
+        />
       </section>
 
-      {/* Новые заявки по моим студентам */}
-      {(pendingCerts.length > 0 || pendingPasses.length > 0) && (
-        <section className="col" style={{ gap: 'var(--s-3)' }}>
-          <h2 className="display" style={{ fontSize: 'var(--fs-22)', margin: 0 }}>Заявки по моим студентам</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s-3)' }}>
-            {pendingCerts.length > 0 && (
-              <PendingRequestsCard
-                title="Справки в работе"
-                icon={<FileText size={18} strokeWidth={1.5} />}
-                rows={pendingCerts}
-                href="/certificates"
-                rowHref={(r) => `/certificates/${r.id}`}
-              />
-            )}
-            {pendingPasses.length > 0 && (
-              <PendingRequestsCard
-                title="Пропуска в работе"
-                icon={<KeyRound size={18} strokeWidth={1.5} />}
-                rows={pendingPasses}
-                href="/passes"
-                rowHref={(r) => `/passes/${r.id}`}
-              />
-            )}
-          </div>
-        </section>
-      )}
-
-      <section className="row" style={{ gap: 'var(--s-3)', flexWrap: 'wrap' }}>
-        <Link href="/my-group" className="card col" style={cardLinkStyle}>
-          <UsersRound size={20} strokeWidth={1.5} />
-          <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>Моя группа</span>
-          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Список студентов и средние баллы</span>
-        </Link>
-        <Link href="/journal" className="card col" style={cardLinkStyle}>
-          <BookOpen size={20} strokeWidth={1.5} />
-          <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>Журнал</span>
-          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Оценки и посещаемость по предметам</span>
-        </Link>
-        <Link href="/schedule" className="card col" style={cardLinkStyle}>
-          <CalendarDays size={20} strokeWidth={1.5} />
-          <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>Расписание</span>
-          <span className="muted" style={{ fontSize: 'var(--fs-12)' }}>Ваше расписание занятий и расписание группы</span>
-        </Link>
-      </section>
-
+      <DashboardGlobalAnims />
       <style jsx>{`
-        :global(.spin) { animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        :global(.dashboard-grid) { /* hook for media-queries below */ }
+        @media (max-width: 1280px) {
+          :global(.dashboard-grid) {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          :global(.dashboard-grid > section:nth-child(3)) {
+            grid-column: 1 / span 2;
+          }
+        }
+        @media (max-width: 900px) {
+          :global(.dashboard-grid) { grid-template-columns: 1fr !important; }
+          :global(.dashboard-grid > section:nth-child(3)) { grid-column: auto; }
+          :global(.quick-row) { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        :global(.initials-grid) {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+          gap: var(--s-1);
+        }
+        :global(.initial-chip) {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 32px;
+          border: 1px solid var(--ais-line);
+          border-radius: var(--r-6);
+          background: var(--ais-paper-2);
+          font-family: var(--ais-font-mono);
+          font-size: 11px;
+          letter-spacing: 0.04em;
+          color: var(--ais-bone-2);
+        }
+        :global(.initial-chip .dot) {
+          position: absolute;
+          bottom: 3px;
+          right: 4px;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+        }
+        :global(.dot--ok) { background: var(--ais-forest); }
+        :global(.dot--warn) { background: var(--ais-ochre); }
+        :global(.dot--bad) { background: var(--ais-ember); }
       `}</style>
     </div>
   );
 }
 
-const cardLinkStyle: React.CSSProperties = {
-  padding: 'var(--s-4)', gap: 'var(--s-2)', textDecoration: 'none', color: 'inherit',
-  flex: '1 1 240px', minWidth: 240,
-};
+/* ────────── subcomponents ────────── */
 
-function PendingRequestsCard({
-  title, icon, rows, href, rowHref,
+function RefreshDot({ title }: { title?: string }) {
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      style={{
+        display: 'inline-block',
+        width: 12, height: 12, borderRadius: '50%',
+        border: '2px solid var(--ais-line)',
+        borderTopColor: 'var(--ais-forest)',
+        animation: 'aisSpin 0.9s linear infinite',
+      }}
+    />
+  );
+}
+
+function Skeleton({
+  width = '100%', height = 16, radius = 4, style,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  rows: RequestRow[];
-  href: string;
-  rowHref: (r: RequestRow) => string;
+  width?: number | string;
+  height?: number | string;
+  radius?: number | string;
+  style?: React.CSSProperties;
 }) {
-  // Показываем максимум пять — остальное доступно по ссылке «Все заявки».
-  const top = rows.slice(0, 5);
   return (
-    <div className="card col" style={{ padding: 'var(--s-4)', gap: 'var(--s-3)' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="row" style={{ gap: 'var(--s-2)', alignItems: 'center' }}>
-          {icon}
-          <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>{title}</span>
-          <span className="badge badge--warn" style={{ fontSize: 11 }}>{rows.length}</span>
+    <span
+      aria-hidden
+      style={{
+        display: 'inline-block',
+        width, height, borderRadius: radius,
+        background:
+          'linear-gradient(90deg, var(--ais-paper-2) 0%, var(--ais-line) 50%, var(--ais-paper-2) 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'aisShimmer 1.4s ease-in-out infinite',
+        ...style,
+      }}
+    />
+  );
+}
+
+function DashboardGlobalAnims() {
+  return (
+    <style jsx global>{`
+      @keyframes aisSpin { to { transform: rotate(360deg); } }
+      @keyframes aisShimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `}</style>
+  );
+}
+
+function HeroCounter({
+  label, value, tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'forest' | 'ochre' | 'ember' | 'bone';
+}) {
+  const color =
+    tone === 'forest' ? 'var(--ais-forest)' :
+    tone === 'ochre'  ? 'var(--ais-ochre)' :
+    tone === 'ember'  ? 'var(--ais-ember)' :
+    'var(--ais-bone)';
+  return (
+    <div className="col" style={{ gap: 4, minWidth: 64, alignItems: 'flex-start' }}>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--ais-bone-4)' }}>
+        {label}
+      </span>
+      <span className="display tnum" style={{ fontSize: 'var(--fs-36)', lineHeight: 1, color }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function LessonRow({
+  isCurrent, times, title, meta,
+}: {
+  isCurrent: boolean;
+  times: [string, string];
+  title: string;
+  meta: string;
+}) {
+  return (
+    <li className="row" style={{ gap: 'var(--s-3)', alignItems: 'flex-start' }}>
+      <div className="mono tnum" style={{ minWidth: 56, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 'var(--fs-13)', color: 'var(--ais-bone)' }}>{times[0]}</div>
+        <div style={{ fontSize: 11, color: 'var(--ais-bone-4)' }}>{times[1]}</div>
+      </div>
+      <span
+        aria-hidden
+        style={{
+          marginTop: 6,
+          width: 8, height: 8, borderRadius: '50%',
+          background: isCurrent ? 'var(--ais-forest)' : 'var(--ais-line-2)',
+          flexShrink: 0,
+        }}
+      />
+      <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 'var(--fs-15)',
+          color: 'var(--ais-bone)',
+          fontStyle: isCurrent ? 'italic' : 'normal',
+          fontWeight: isCurrent ? 600 : 400,
+        }}>
+          {title}{isCurrent && <span className="mono" style={{ marginLeft: 8, fontSize: 11, color: 'var(--ais-forest)', letterSpacing: '0.1em' }}>· ИДЁТ</span>}
         </div>
-        <Link href={href} className="link mono" style={{ fontSize: 11 }}>Все →</Link>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ais-bone-3)' }}>
+          {meta}
+        </div>
       </div>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {top.map((r) => (
-          <li key={r.id} style={{ padding: 'var(--s-2) 0', borderTop: '1px solid var(--ais-line)' }}>
-            <Link href={rowHref(r)} style={{ color: 'inherit', textDecoration: 'none' }}>
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--s-3)' }}>
-                <div className="col" style={{ gap: 0, minWidth: 0, flex: 1 }}>
-                  <span style={{ fontSize: 'var(--fs-13)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {r.fullName}
-                  </span>
-                  <span className="mono muted" style={{ fontSize: 11 }}>
-                    {r.groupName}
-                    {r.certType ? ` · ${r.certType}` : ''}
-                  </span>
-                </div>
-                <span className="mono muted" style={{ fontSize: 11 }}>
-                  {new Date(r.createdAt).toLocaleDateString('ru-RU')}
-                </span>
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+      <ArrowRight size={12} strokeWidth={1.75} style={{ color: 'var(--ais-bone-4)', marginTop: 6 }} />
+    </li>
   );
 }
 
-function DebtorsCard({ rows }: { rows: DebtorRow[] }) {
+function DebtRow({ item }: { item: GroupDebtRow }) {
+  const initials = `${item.lastName[0] ?? ''}${item.firstName[0] ?? ''}`.toUpperCase();
   return (
-    <div className="card col" style={{ padding: 'var(--s-4)', gap: 'var(--s-3)' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>
-          <AlertTriangle size={14} strokeWidth={1.75} style={{ verticalAlign: '-2px', marginRight: 6, color: 'var(--ais-ember)' }} />
-          Неудовлетворительные оценки за две недели
-        </span>
-        <span className="mono muted">{rows.length}</span>
+    <Link
+      href={`/dossier/${item.studentExternalId}`}
+      className="row"
+      style={{ gap: 'var(--s-3)', alignItems: 'flex-start', textDecoration: 'none', color: 'inherit' }}
+    >
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 32, height: 32, borderRadius: 'var(--r-6)',
+        border: '1px solid var(--ais-line)', background: 'var(--ais-paper-2)',
+        fontFamily: 'var(--ais-font-mono)', fontSize: 11, color: 'var(--ais-bone-3)',
+        flexShrink: 0,
+      }}>
+        {initials}
+      </span>
+      <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--fs-14)', color: 'var(--ais-bone)' }}>
+          {item.lastName} {item.firstName}
+        </div>
+        <div className="muted" style={{ fontSize: 11 }}>
+          {item.subjects.length > 0 ? item.subjects.slice(0, 3).join(' · ') : '—'}
+        </div>
       </div>
-      {rows.length === 0 ? (
-        <span className="muted" style={{ fontSize: 'var(--fs-13)' }}>За последние две недели «двоек» не выставлено.</span>
-      ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
-          {rows.slice(0, 12).map((r, i) => (
-            <li key={i} style={{ borderTop: i ? '1px solid var(--ais-line)' : 'none', paddingTop: i ? 'var(--s-2)' : 0 }}>
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 'var(--fs-13)', fontWeight: 500 }}>{r.studentName}</span>
-                <span className="badge badge--bad">×{r.twos.length}</span>
-              </div>
-              <div className="muted" style={{ fontSize: 11 }}>
-                {r.twos.slice(0, 3).map((t, j) => (
-                  <span key={j}>{j ? ' · ' : ''}{t.subject} ({fmtDateRu(t.date)})</span>
-                ))}
-                {r.twos.length > 3 && <span> · и ещё {r.twos.length - 3}</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+      <span className="display tnum" style={{ fontSize: 'var(--fs-22)', color: 'var(--ais-ember)', lineHeight: 1 }}>
+        {item.count}
+      </span>
+      <ArrowRight size={12} strokeWidth={1.75} style={{ color: 'var(--ais-bone-4)', marginTop: 8 }} />
+    </Link>
   );
 }
 
-function AbsencesCard({ rows }: { rows: AbsenceRow[] }) {
-  // Группируем по студенту
-  const byStudent = new Map<string, AbsenceRow[]>();
-  for (const r of rows) {
-    const key = `${r.groupName}/${r.studentName}`;
-    if (!byStudent.has(key)) byStudent.set(key, []);
-    byStudent.get(key)!.push(r);
-  }
-  const grouped = Array.from(byStudent.entries());
-
+function QuickCard({
+  icon, title, subtitle, href, accent = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  href: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="card col" style={{ padding: 'var(--s-4)', gap: 'var(--s-3)' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: 'var(--fs-14)', fontWeight: 600 }}>
-          <GraduationCap size={14} strokeWidth={1.75} style={{ verticalAlign: '-2px', marginRight: 6 }} />
-          Сегодня отсутствуют
-        </span>
-        <span className="mono muted">{grouped.length}</span>
+    <Link
+      href={href}
+      className="card row"
+      style={{
+        padding: 'var(--s-4)',
+        gap: 'var(--s-3)',
+        textDecoration: 'none',
+        color: 'inherit',
+        background: accent ? 'var(--ais-forest)' : undefined,
+        borderColor: accent ? 'var(--ais-forest)' : undefined,
+      }}
+    >
+      <div
+        style={{
+          width: 36, height: 36, borderRadius: 'var(--r-6)',
+          background: accent ? 'rgba(255,255,255,0.18)' : 'var(--ais-paper-2)',
+          border: accent ? 'none' : '1px solid var(--ais-line)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: accent ? 'var(--ais-ivy-2)' : 'var(--ais-bone-2)',
+          flexShrink: 0,
+        }}
+      >
+        {icon}
       </div>
-      {grouped.length === 0 ? (
-        <span className="muted" style={{ fontSize: 'var(--fs-13)' }}>Все студенты на занятиях.</span>
-      ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
-          {grouped.slice(0, 16).map(([key, items], i) => {
-            const worst = items.reduce<AbsenceRow>(
-              (acc, x) => (priority(x.status) > priority(acc.status) ? x : acc),
-              items[0],
-            );
-            return (
-              <li key={key} style={{ borderTop: i ? '1px solid var(--ais-line)' : 'none', paddingTop: i ? 'var(--s-2)' : 0 }}>
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontSize: 'var(--fs-13)', fontWeight: 500 }}>{worst.studentName}</span>
-                  <span className={`badge ${absenceBadgeClass(worst.status)}`} title={worst.raw}>
-                    {absenceLabel(worst.status)}
-                  </span>
-                </div>
-                <span className="muted" style={{ fontSize: 11 }}>{worst.groupName}{items.length > 1 && ` · ${items.length} ${pluralizeLessons(items.length)}`}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+      <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--fs-14)', fontWeight: 600, color: accent ? 'var(--ais-ivy-2)' : 'var(--ais-bone)' }}>
+          {title}
+        </div>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: accent ? 'rgba(20,38,30,0.7)' : 'var(--ais-bone-3)' }}>
+          {subtitle}
+        </div>
+      </div>
+      <ArrowRight size={14} strokeWidth={1.75} style={{ color: accent ? 'var(--ais-ivy-2)' : 'var(--ais-bone-4)', alignSelf: 'center' }} />
+    </Link>
   );
 }
 
-// ────────── helpers ──────────
+/* ────────── helpers ────────── */
 
-function isTwo(v: unknown): boolean {
-  if (v === null || v === undefined) return false;
-  if (typeof v === 'object' && 'value' in (v as object)) {
-    const value = (v as { value: unknown }).value;
-    if (typeof value === 'string') return TWO_VALUES.has(value);
-    if (typeof value === 'number') return value <= 2;
-  }
-  if (typeof v === 'string') return TWO_VALUES.has(v);
-  if (typeof v === 'number') return v <= 2;
-  return false;
-}
+const PERIOD_TIMES: Array<[string, string]> = [
+  ['08:30', '10:00'],
+  ['10:10', '11:40'],
+  ['11:50', '13:20'],
+  ['14:00', '15:30'],
+  ['15:40', '17:10'],
+  ['17:20', '18:50'],
+  ['19:00', '20:30'],
+  ['20:40', '22:10'],
+];
 
-function classifyAbsence(t: string): AbsenceRow['status'] {
-  if (SICK_TYPES.has(t)) return 'sick';
-  if (LATE_TYPES.has(t)) return 'late';
-  if (EXCUSED_TYPES.has(t)) return 'excused';
-  if (ABSENT_TYPES.has(t)) return 'absent';
-  return 'other';
-}
-function absenceLabel(s: AbsenceRow['status']): string {
-  switch (s) {
-    case 'sick': return 'Болеет';
-    case 'late': return 'Опоздание';
-    case 'excused': return 'УП';
-    case 'absent': return 'НП';
-    default: return '?';
-  }
-}
-function absenceBadgeClass(s: AbsenceRow['status']): string {
-  switch (s) {
-    case 'sick': return 'badge--warn';
-    case 'absent': return 'badge--bad';
-    case 'excused': return 'badge--ok';
-    case 'late': return 'badge--warn';
-    default: return '';
-  }
-}
-function priority(s: AbsenceRow['status']): number {
-  return s === 'absent' ? 4 : s === 'sick' ? 3 : s === 'late' ? 2 : s === 'excused' ? 1 : 0;
+function activeLessonsCount(
+  today: ChtotibTodayResponse | null,
+  tab: 'mine' | 'group',
+): number {
+  if (!today) return 0;
+  const sec = today.sections.find((s) => s.kind === (tab === 'mine' ? 'teacher' : 'group'));
+  if (!sec) return 0;
+  return (sec.lessons as unknown[]).length;
 }
 
-function isoDate(d: Date): string {
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
+function computeCurrentPeriod(now: Date): number | null {
+  const mins = now.getHours() * 60 + now.getMinutes();
+  for (let i = 0; i < PERIOD_TIMES.length; i++) {
+    const [s, e] = PERIOD_TIMES[i];
+    const [sh, sm] = s.split(':').map(Number);
+    const [eh, em] = e.split(':').map(Number);
+    const a = sh * 60 + sm;
+    const b = eh * 60 + em;
+    if (mins >= a && mins <= b) return i + 1;
+  }
+  return null;
 }
-function parseISO(s: string): Date | null {
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
+
+function fmtTime(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function fmtDateRu(iso: string): string {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return `${d}.${m}.${y}`;
+function pad(n: number) { return String(n).padStart(2, '0'); }
+
+function formatDateMono(d: Date): string {
+  const days = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+  const months = ['ЯНВАРЯ','ФЕВРАЛЯ','МАРТА','АПРЕЛЯ','МАЯ','ИЮНЯ','ИЮЛЯ','АВГУСТА','СЕНТЯБРЯ','ОКТЯБРЯ','НОЯБРЯ','ДЕКАБРЯ'];
+  return `${days[d.getDay()]} · ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function pluralizeStudents(n: number): string {
-  const last = n % 10, lastTwo = n % 100;
-  if (lastTwo >= 11 && lastTwo <= 14) return 'студентов';
-  if (last === 1) return 'студент';
-  if (last >= 2 && last <= 4) return 'студента';
-  return 'студентов';
-}
-function pluralizeLessons(n: number): string {
-  const last = n % 10, lastTwo = n % 100;
-  if (lastTwo >= 11 && lastTwo <= 14) return 'занятий';
-  if (last === 1) return 'занятие';
-  if (last >= 2 && last <= 4) return 'занятия';
-  return 'занятий';
-}
+
 function byHour(h: number): string {
   if (h < 5)  return 'Доброй ночи';
   if (h < 12) return 'Доброе утро';
   if (h < 18) return 'Добрый день';
   return 'Добрый вечер';
 }
-function formatDate(d: Date): string {
-  const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  return `${days[d.getDay()]} · ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+
+function pluralize(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(n) % 100;
+  const teen = abs % 10;
+  if (abs > 10 && abs < 20) return forms[2];
+  if (teen > 1 && teen < 5) return forms[1];
+  if (teen === 1) return forms[0];
+  return forms[2];
 }

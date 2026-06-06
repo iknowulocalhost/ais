@@ -5,10 +5,6 @@ export type StudentStatus =
   | 'EXPELLED'     // отчислен
   | 'GRADUATED';   // выпущен
 
-/**
- * Студент. Связан с User (учётка для входа) опциональной FK.
- * Абитуриент (APPLICANT) может существовать без User — его заводит приёмная комиссия.
- */
 export class Student {
   constructor(
     public readonly id: string,

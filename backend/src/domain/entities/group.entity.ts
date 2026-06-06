@@ -1,6 +1,3 @@
-/**
- * Учебная группа.
- */
 export class Group {
   constructor(
     public readonly id: string,

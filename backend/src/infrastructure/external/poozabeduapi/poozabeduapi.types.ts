@@ -1,17 +1,14 @@
-/**
- * DTO ответов «Сетевого ПОО» (poo.zabedu.ru).
- * Намеренно мягкие: IRTech добавляют/убирают поля в патч-релизах.
- */
+/** DTO Сетевого ПОО (poo.zabedu.ru). Поля мягкие — IRTech правят их в патч-релизах. */
 
 export interface OrganizationInfo {
-  organizationId: string;          // UUID
-  rosobrId?: string;               // UUID Рособрнадзора
-  organizationDeptId?: number;     // 1, 2, …
+  organizationId: string;
+  rosobrId?: string;
+  organizationDeptId?: number;
   name?: string;
   shortName?: string;
   abbreviation?: string;
-  organizationType?: string;       // 'Spo' и т.п.
-  type?: string;                   // 'Poo' и т.п.
+  organizationType?: string;
+  type?: string;
   legalStatus?: string;
   directorName?: string;
   directorPosition?: string;
@@ -32,22 +29,18 @@ export interface OrganizationInfo {
     okpo?: string;
     [k: string]: unknown;
   };
-  // …прочее, что IRTech добавит — приходит через index signature
   [key: string]: unknown;
 }
 
 export interface OrganizationStatistics {
-  [key: string]: unknown;          // структура пока не известна — увидим на ping
+  [key: string]: unknown;
 }
 
 export interface SystemInfo {
-  [key: string]: unknown;          // версии, build, язык
+  [key: string]: unknown;
 }
 
-/**
- * Сотрудник школы. Возвращает `/services/people/employees/all` —
- * лёгкий список без ПДн (для дропдаунов, привязки TEA-аккаунтов).
- */
+/** Сотрудник (/services/people/employees/all). */
 export interface PzaEmployee {
   id: number;
   firstName?: string;
@@ -59,47 +52,40 @@ export interface PzaEmployee {
   [key: string]: unknown;
 }
 
-// ─────── Сущности (минимально-необходимый набор полей) ───────
+// ─────── Сущности ───────
 
 export interface PzaShortGroupRef {
   id: number;
   name: string;
 }
 
-/** Подразделение учебного заведения (отделение). */
 export interface PzaDepartment {
   id: number;
   name: string;
   managerId?: number;
 }
 
-/** Учебная группа. */
 export interface PzaStudentGroup {
   id: number;
   name: string;
   code?: string;
-  yearNumber?: number;             // курс 1..N
-  educationForm?: string;          // 'FullTime' | …
+  yearNumber?: number;
+  educationForm?: string;
   departmentId?: number;
-  curatorId?: number;              // id сотрудника-куратора
+  curatorId?: number;
 }
 
-/**
- * Студент в формате list-эндпоинта `/services/people/students`.
- * Намеренно НЕ описываем passport/address/snils/parents — эти поля приходят только
- * на детальном эндпоинте `/students/{id}`, а копировать их к нам в БД мы не хотим
- * (152-ФЗ: принцип минимизации).
- */
+/** Студент в листинге /services/people/students (без ПДн). */
 export interface PzaStudentSummary {
   id: number;
   firstName: string;
   lastName: string;
   middleName?: string;
-  birthday?: string;               // ISO строка с микросекундами от IRTech
+  birthday?: string;
   gender?: 'Male' | 'Female' | string;
   studentGroup?: PzaShortGroupRef;
   userProfileId?: number;
-  educationBasis?: string;         // 'FederalBudget' | 'NaturalPerson' | …
+  educationBasis?: string;
   educationLevel?: string;
   formOfTraining?: string;
   graduationDate?: string;
@@ -107,17 +93,12 @@ export interface PzaStudentSummary {
   isEsiaBound?: boolean;
 }
 
-/** Ответ list-эндпоинта студентов с серверной пагинацией. */
 export interface PzaStudentsPage {
   studentsCount: number;
   students: PzaStudentSummary[];
 }
 
-/**
- * Полная карточка студента — отдаётся `/services/people/students/{id}`.
- * Содержит ПДн (паспорт, адреса, СНИЛС, родители) — НИКОГДА не сохраняем в БД,
- * только проксируем на запрос авторизованного оператора. Поля описаны мягко.
- */
+/** Полная карточка студента — /students/{id}. Содержит ПДн, в БД не сохраняем. */
 export interface PzaStudentDetail extends PzaStudentSummary {
   birthplace?: string;
   registration?: string;
@@ -141,14 +122,14 @@ export interface PzaStudentDetail extends PzaStudentSummary {
     firstName?: string;
     lastName?: string;
     middleName?: string;
-    relationshipType?: string;     // 'Mother' | 'Father' | …
+    relationshipType?: string;
     phone?: string;
     address?: string;
     [k: string]: unknown;
   }>;
   decrees?: Array<{
     id: number;
-    type?: string;                 // 'Enroll' | 'Expel' | …
+    type?: string;
     date?: string;
     effectiveDate?: string;
     studentGroup?: PzaShortGroupRef;
@@ -161,17 +142,15 @@ export interface PzaStudentDetail extends PzaStudentSummary {
 
 // ─────── Журнал / оценки ───────
 
-/** Группа в перечне доступных журналов: `/services/journal/gradebook/student-groups`. */
 export interface PzaGradebookGroup {
-  id: number;          // groupId
+  id: number;
   name: string;
   code?: string;
   yearNumber?: number;
 }
 
-/** Предмет в учебном плане группы за конкретный семестр. */
 export interface PzaScheduleSubject {
-  id: number;                      // gradebookId этого предмета (нужен для /subjects/{id})
+  id: number;
   name: string;
   plannedHours?: number;
   editable?: boolean;
@@ -179,50 +158,44 @@ export interface PzaScheduleSubject {
   remarks?: unknown[];
 }
 
-/** Один семестр группы — приходит в `/gradebook/{groupId}/entries`. */
 export interface PzaGradebookEntry {
-  id: number;                       // gradebookId самого журнала-семестра
-  name: string;                     // обычно совпадает с именем группы
+  id: number;
+  name: string;
   yearNumber: number;
   termNumber: number;
-  termType: string;                 // 'Semester' | …
+  termType: string;
   isActive: boolean;
   startDate: string;
   endDate: string;
   scheduleSubjects: PzaScheduleSubject[];
 }
 
-/** Конкретный урок и оценки/посещаемость учеников по нему. */
 export interface PzaGradebookLesson {
   id: number;
   date: string;
   scheduleLessonId?: number;
-  type: string;                     // 'Lecture' | 'PracticalWork' | 'PracticalTraining' | 'Examination' | …
+  type: string;
   duration?: number;
   startTime?: string;
   endTime?: string;
   tasks?: Array<{
     id: number;
-    type?: string;                  // 'Home' | …
+    type?: string;
     topic?: string;
     condition?: string;
     attachments?: unknown[];
   }>;
-  /**
-   * Карта оценок и пропусков по этому уроку.
-   * Ключ — id студента в gradebook (см. `students[].id`), не глобальный externalId.
-   */
+  /** Ключ — id студента в gradebook (не глобальный externalId). */
   markSets?: Record<string, {
-    absenceType?: string;           // 'IsAbsentByNotValidReason' | 'IsAbsentByValidReason' | 'IsLate' | …
-    marks?: Record<string, unknown>; // конкретный формат оценки — увидим в живом ответе
+    absenceType?: string;
+    marks?: Record<string, unknown>;
   }>;
   plannedLessons?: Record<string, number>;
 }
 
-/** Записанный в журнал ученик группы (id здесь — internal к gradebook). */
 export interface PzaGradebookStudent {
   id: number;
-  number?: number;                  // позиция в журнале
+  number?: number;
   startDate?: string;
   endDate?: string;
   averageScore?: number;
@@ -231,7 +204,6 @@ export interface PzaGradebookStudent {
   middleName?: string;
 }
 
-/** Полный ответ `/gradebook/{gradebookId}/subjects/{subjectId}`. */
 export interface PzaGradebookSubject {
   workingProgram?: {
     isApproved?: boolean;
@@ -250,26 +222,16 @@ export interface PzaGradebookSubject {
   lessons: PzaGradebookLesson[];
   students: PzaGradebookStudent[];
   remarks?: unknown[];
-  teacher?: string;                 // 'Каргин П.А.' (в виде строки, не объекта)
+  teacher?: string;
 }
 
 // ─────── Расписание ───────
-//
-// Тела соответствующих ответов IRTech не были захвачены HAR-ом (Brave стрипает крупные
-// JSON), поэтому пока описано мягко. Уточним типы после первого живого вызова через
-// наш прокси и обновим, не ломая обратной совместимости.
 
 export type PzaScheduleTeachers = unknown;
 export type PzaScheduleClassrooms = unknown;
 
 export interface PzaScheduleGroupEntries {
-  // Из URL `/services/schedule/timetable/{groupId}/entries` известно, что это список
-  // «планов расписания» у группы, по которым потом тянется недельный grid с диапазоном дат.
   [key: string]: unknown;
 }
 
-/**
- * Расписание за период. Вход: `from`, `to` в формате `yyyy-mm-dd`,
- * `type` — обычно `studentGroup`, `id` — id плана/группы из upstream.
- */
 export type PzaScheduleTimetable = unknown;

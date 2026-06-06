@@ -68,7 +68,17 @@ export class RefreshUseCase {
     const refreshTtl = this.cfg.get<string>('JWT_REFRESH_TTL', '7d');
 
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, roles: user.roles } as JwtAccessPayload,
+      {
+        sub: user.id,
+        email: user.email,
+        roles: user.roles,
+        // КРИТИЧНО: без этого поля после первого refresh'а (через ~15 мин после
+        // логина) пропадает привязка TEA к сотруднику Сетевого ПОО — RolesGuard
+        // и allowedGroupIds читают netschoolEmployeeId из JWT и для TEA без
+        // него возвращают «нет групп». Бывший баг: после привязки employee_id
+        // в админке роли подтягивались, а группа исчезала через 15 мин.
+        netschoolEmployeeId: user.netschoolEmployeeId,
+      } as JwtAccessPayload,
       {
         secret: this.cfg.getOrThrow<string>('JWT_ACCESS_SECRET'),
         expiresIn: this.cfg.get<string>('JWT_ACCESS_TTL', '15m'),

@@ -6,12 +6,7 @@ import { Protected } from '@/components/protected';
 import { apiFetch, ApiError } from '@/lib/api';
 import { explainError } from '@/lib/errors';
 
-/**
- * Журнал из Сетевого ПОО (read-only прокси).
- *
- * Drill-down: группы → семестры группы → предмет → таблица оценок и пропусков.
- * Никаких сохранений на нашей стороне — каждый клик уходит в upstream.
- */
+/** /journal — read-only прокси Сетевого ПОО: группы → семестры → предмет → таблица. */
 
 interface JournalGroup {
   id: number;
@@ -116,7 +111,7 @@ function formatMarkValue(raw: unknown): string {
 
 export default function JournalPage() {
   return (
-    <Protected roles={['SUPERADMIN', 'ADM', 'COM', 'TEA']}>
+    <Protected roles={['SUPERADMIN', 'ADM', 'ADMINISTRATION', 'COM', 'TEA', 'STU']}>
       <JournalView />
     </Protected>
   );
@@ -330,11 +325,11 @@ function SubjectView({
 
 function SubjectGrid({ data }: { data: SubjectData }) {
   const sortedLessons = useMemo(
-    () => [...data.lessons].sort((a, b) => a.date.localeCompare(b.date)),
+    () => [...(data.lessons ?? [])].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')),
     [data.lessons],
   );
   const sortedStudents = useMemo(
-    () => [...data.students].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
+    () => [...(data.students ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
     [data.students],
   );
 
@@ -416,25 +411,28 @@ function CellValue({ cell }: { cell: MarkCell }) {
     );
   }
   if (cell.absenceType) {
-    const label = ABSENCE_LABELS[cell.absenceType] ?? cell.absenceType.slice(0, 2);
-    return <span className="mono" style={{ color: 'var(--ais-ember)' }} title={cell.absenceType}>
+    const absStr = typeof cell.absenceType === 'string' ? cell.absenceType : String(cell.absenceType);
+    const label = ABSENCE_LABELS[absStr] ?? absStr.slice(0, 2);
+    return <span className="mono" style={{ color: 'var(--ais-ember)' }} title={absStr}>
       {label}
     </span>;
   }
   return <span className="muted">·</span>;
 }
 
-function fmt(iso: string): string {
-  const [y, m, d] = iso.slice(0, 10).split('-');
+function fmt(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const s = typeof iso === 'string' ? iso : String(iso);
+  const [y, m, d] = s.slice(0, 10).split('-');
   return `${d}.${m}.${y}`;
 }
 
-function lessonTypeShort(t: string): string {
+function lessonTypeShort(t: string | null | undefined): string {
   switch (t) {
     case 'Lecture': return 'лек';
     case 'PracticalWork': return 'пр';
     case 'PracticalTraining': return 'тр';
     case 'Examination': return 'экз';
-    default: return t.slice(0, 3).toLowerCase();
+    default: return (typeof t === 'string' ? t : '').slice(0, 3).toLowerCase();
   }
 }

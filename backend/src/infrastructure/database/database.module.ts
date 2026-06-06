@@ -23,6 +23,10 @@ import {
   PoozabeduStudentGroupOrmEntity,
   PoozabeduStudentOrmEntity,
 } from './entities/poozabedu-mirror.orm-entity';
+import { MaxLinkTokenOrmEntity } from './entities/max-link-token.orm-entity';
+import { MaxOutboxOrmEntity } from './entities/max-outbox.orm-entity';
+import { TypeOrmMaxOutboxRepository } from './repositories/max-outbox.repository.impl';
+import { MAX_OUTBOX_REPOSITORY } from '../../domain/repositories/max-outbox.repository';
 import { TypeOrmUserRepository } from './repositories/user.repository.impl';
 import { TypeOrmAuditLogRepository } from './repositories/audit-log.repository.impl';
 import { TypeOrmGroupRepository } from './repositories/group.repository.impl';
@@ -86,6 +90,8 @@ const ORM_ENTITIES = [
   PoozabeduDepartmentOrmEntity,
   PoozabeduStudentGroupOrmEntity,
   PoozabeduStudentOrmEntity,
+  MaxLinkTokenOrmEntity,
+  MaxOutboxOrmEntity,
 ];
 
 @Global()
@@ -136,6 +142,8 @@ const ORM_ENTITIES = [
     TypeOrmPoozabeduDepartmentRepository,
     TypeOrmPoozabeduStudentGroupRepository,
     TypeOrmPoozabeduStudentRepository,
+    TypeOrmMaxOutboxRepository,
+    { provide: MAX_OUTBOX_REPOSITORY,       useExisting: TypeOrmMaxOutboxRepository },
     { provide: USER_REPOSITORY,             useExisting: TypeOrmUserRepository },
     { provide: AUDIT_LOG_REPOSITORY,        useExisting: TypeOrmAuditLogRepository },
     { provide: GROUP_REPOSITORY,            useExisting: TypeOrmGroupRepository },
@@ -176,6 +184,7 @@ const ORM_ENTITIES = [
     POOZABEDU_DEPARTMENT_REPOSITORY,
     POOZABEDU_STUDENT_GROUP_REPOSITORY,
     POOZABEDU_STUDENT_REPOSITORY,
+    MAX_OUTBOX_REPOSITORY,
     TypeOrmModule,
   ],
 })
