@@ -4,13 +4,16 @@ import {
   PassRepository,
 } from '../../../domain/repositories/pass.repository';
 import { AuditService } from '../../services/audit.service';
+import { NotifyService } from '../../services/notify.service';
 import { RequestContext } from '../../../infrastructure/context/request-context';
-import {
-  MAX_BOT_NOTIFIER,
-  MaxBotNotifier,
-} from '../../../domain/services/max-bot-notifier';
 
 export type PassDecision = 'APPROVE' | 'REJECT' | 'RESET';
+
+const PASS_STATUS_RU: Record<string, string> = {
+  PENDING: 'возвращена в работу',
+  APPROVED: 'одобрена — пропуск готов к выдаче',
+  REJECTED: 'отклонена',
+};
 
 export interface SetPassStatusInput {
   passId: string;
@@ -24,7 +27,7 @@ export class SetPassStatusUseCase {
     @Inject(PASS_REPOSITORY) private readonly passes: PassRepository,
     private readonly audit: AuditService,
     private readonly reqCtx: RequestContext,
-    @Inject(MAX_BOT_NOTIFIER) private readonly bot: MaxBotNotifier,
+    private readonly notify: NotifyService,
   ) {}
 
   async execute(input: SetPassStatusInput): Promise<void> {
@@ -59,13 +62,16 @@ export class SetPassStatusUseCase {
       newState: { status: pass.status, statusComment: pass.statusComment },
     });
 
-    // Webhook в Max-бот: только если у заявки привязан max_user_id
-    // и статус действительно изменился. Бот отправит студенту push сам.
-    if (pass.maxUserId && oldState.status !== pass.status) {
-      await this.bot.notifyUser({
-        userId: pass.maxUserId,
-        newStatus: pass.status,
-        comment: pass.statusComment,
+    // MAX → outbox через NotifyService.
+    if (oldState.status !== pass.status && pass.submitterUserId) {
+      const verb = PASS_STATUS_RU[pass.status] ?? pass.status;
+      const lines = [`Заявка на пропуск ${verb}.`];
+      if (pass.statusComment) lines.push(`Комментарий: ${pass.statusComment}`);
+      await this.notify.enqueue({
+        userId: pass.submitterUserId,
+        to: '',
+        subject: 'Статус заявки на пропуск изменён',
+        text: lines.join('\n'),
       });
     }
   }

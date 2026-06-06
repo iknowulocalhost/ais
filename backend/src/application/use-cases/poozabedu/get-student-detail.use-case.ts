@@ -23,6 +23,12 @@ export class GetStudentDetailUseCase {
 
     const result = await this.api.withSession(() => this.api.getStudentDetail(externalId));
 
+    // Сетевой ПОО на несуществующий id возвращает 200 с пустым объектом —
+    // явно валидируем по обязательным полям и кидаем 404.
+    if (!result || typeof result !== 'object' || !result.id || !result.lastName) {
+      throw new NotFoundException(`Студент с id=${externalId} не найден`);
+    }
+
     await this.audit.record({
       ctx,
       action: 'READ_SENSITIVE',

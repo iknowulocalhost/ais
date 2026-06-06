@@ -29,11 +29,13 @@ export class NotificationProcessor extends WorkerHost {
       subject: job.data.subject,
       text: job.data.text,
       html: job.data.html,
+      userId: job.data.userId,
     });
     if (!ok) {
-      // Пробрасываем — BullMQ засчитает failure и ретрайнет согласно политике.
-      throw new Error(`NotificationChannel.send returned false for ${job.data.to}`);
+      // false = пропуск (нет MAX-привязки и т.п.) — не ретраим, просто фиксируем.
+      this.logger.warn(`[job ${job.id}] notification skipped (to=${job.data.to})`);
+      return;
     }
-    this.logger.debug(`[job ${job.id}] sent → ${job.data.to}`);
+    this.logger.debug(`[job ${job.id}] enqueued → outbox for ${job.data.to || job.data.userId}`);
   }
 }

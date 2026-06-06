@@ -6,8 +6,6 @@ import { SetPassStatusUseCase } from '../../application/use-cases/passes/set-pas
 import { InitPassTicketUploadUseCase } from '../../application/use-cases/passes/init-pass-ticket-upload.use-case';
 import { DeletePassTicketUseCase } from '../../application/use-cases/passes/delete-pass-ticket.use-case';
 import { AuditService } from '../../application/services/audit.service';
-import { MaxBotService } from '../../application/services/max-bot.service';
-import { MAX_BOT_NOTIFIER } from '../../domain/services/max-bot-notifier';
 
 @Module({
   controllers: [PassesController],
@@ -18,8 +16,6 @@ import { MAX_BOT_NOTIFIER } from '../../domain/services/max-bot-notifier';
     InitPassTicketUploadUseCase,
     DeletePassTicketUseCase,
     AuditService,
-    MaxBotService,
-    { provide: MAX_BOT_NOTIFIER, useExisting: MaxBotService },
   ],
 })
 export class PassesModule {}
