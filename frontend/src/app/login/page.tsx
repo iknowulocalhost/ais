@@ -86,11 +86,13 @@ export default function LoginPage() {
               <input
                 className="input"
                 style={{ height: '56px', fontSize: '16px' }}
-                type="email"
+                type="text"
+                autoComplete="username"
+                inputMode="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@tti.ru"
+                placeholder="доменный логин или email"
               />
             </div>
 
