@@ -23,6 +23,7 @@ import { AuditService, AuditContext } from '../../services/audit.service';
 import { Logger } from '@nestjs/common';
 import { LdapLoginUseCase } from './ldap-login.use-case';
 import { User } from '../../../domain/entities/user.entity';
+import { PoozabeduApiClient } from '../../../infrastructure/external/poozabeduapi/poozabeduapi.client';
 
 export interface JwtAccessPayload {
   sub: string;
@@ -66,6 +67,7 @@ export class LoginUseCase {
     @Inject(POOZABEDU_STUDENT_REPOSITORY)
     private readonly mirrorStudents: PoozabeduStudentRepository,
     private readonly ldap: LdapLoginUseCase,
+    private readonly poozabeduapi: PoozabeduApiClient,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
     private readonly audit: AuditService,
@@ -185,6 +187,41 @@ export class LoginUseCase {
         }
       } catch (e) {
         this.logger.warn(`auto-link error: ${(e as Error).message}`);
+      }
+    }
+
+    // Аналогично для TEA: ищем сотрудника в Сетевом ПОО по ФИО и привязываем
+    // netschoolEmployeeId. Без этого TEA не увидит свои курируемые группы.
+    if (
+      user.roles.includes(Role.TEA) &&
+      user.netschoolEmployeeId === null
+    ) {
+      try {
+        const employees = await this.poozabeduapi.withSession(() =>
+          this.poozabeduapi.listAllEmployees(),
+        );
+        const ln = user.lastName.trim().toLowerCase();
+        const fn = user.firstName.trim().toLowerCase();
+        const mn = (user.middleName ?? '').trim().toLowerCase();
+        const matches = employees.filter(
+          (e) =>
+            !e.isFired &&
+            (e.lastName ?? '').trim().toLowerCase() === ln &&
+            (e.firstName ?? '').trim().toLowerCase() === fn &&
+            (mn === '' || (e.middleName ?? '').trim().toLowerCase() === mn),
+        );
+        if (matches.length === 1) {
+          user.netschoolEmployeeId = matches[0].id;
+          this.logger.log(
+            `auto-link TEA ${user.id} → poozabedu employee #${matches[0].id} (${user.lastName} ${user.firstName})`,
+          );
+        } else if (matches.length > 1) {
+          this.logger.warn(
+            `auto-link TEA skipped: ${matches.length} однофамильцев для ${user.lastName} ${user.firstName}`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn(`auto-link TEA error: ${(e as Error).message}`);
       }
     }
 

@@ -24,7 +24,12 @@ export function MaxLinkGate() {
   const [error, setError] = useState<string | null>(null);
   const fetchedFor = useRef<string | null>(null);
 
-  const suppressed = !user || pathname.startsWith('/login') || pathname.startsWith('/me');
+  // Админам MAX не обязателен — у них почти нет адресных уведомлений, а оплачивать
+  // лишние клики на каждом входе не за что.
+  const isAdminLike =
+    !!user && (user.roles.includes('SUPERADMIN') || user.roles.includes('ADM'));
+  const suppressed =
+    !user || isAdminLike || pathname.startsWith('/login') || pathname.startsWith('/me');
 
   useEffect(() => {
     if (suppressed) return;
