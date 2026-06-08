@@ -38,10 +38,11 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
           useSSL: u.protocol === 'https:',
           accessKey: cfg.getOrThrow<string>('MINIO_ACCESS_KEY'),
           secretKey: cfg.getOrThrow<string>('MINIO_SECRET_KEY'),
-          // path-style adressing: presigned URL содержит /<bucket>/<key>.
-          // path-prefix (если minio за nginx /minio/) — minio JS-клиент его сам не знает,
-          // поэтому используем хост как «корень». Если нужен под-path, поднимай
-          // отдельный subdomain minio.chtotib.ru.
+          // Регион должен совпадать с тем, что у внутреннего клиента (us-east-1
+          // при ensureBucket). Без явного region minio-js при подписи делает
+          // GetBucketRegion-запрос на этот же endpoint — DNS-резолв падает,
+          // если minio.chtotib.ru ещё не доступен из контейнера бэка.
+          region: 'us-east-1',
         });
         this.logger.log(`MinIO presign endpoint: ${publicUrl}`);
       } catch (e) {
