@@ -125,6 +125,10 @@ services:
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+      # Публичный URL minio для подписи presigned-ссылок, которые отдаются
+      # браузеру. Должен быть HTTPS, иначе на HTTPS-страницах AИС mixed-content.
+      # Например: https://minio.chtotib.ru
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}

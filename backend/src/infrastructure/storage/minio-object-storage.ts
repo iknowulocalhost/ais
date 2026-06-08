@@ -11,7 +11,10 @@ import {
 @Injectable()
 export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   private readonly logger = new Logger(MinioObjectStorage.name);
+  /** Внутренний клиент: bucketExists / putObject / deleteObject через docker-сеть. */
   private readonly client: Client;
+  /** Клиент для подписи URL, которые отдаём браузеру. По умолчанию = внутренний. */
+  private readonly publicClient: Client;
 
   constructor(cfg: ConfigService) {
     this.client = new Client({
@@ -21,6 +24,33 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
       accessKey: cfg.getOrThrow<string>('MINIO_ACCESS_KEY'),
       secretKey: cfg.getOrThrow<string>('MINIO_SECRET_KEY'),
     });
+
+    // MINIO_PUBLIC_URL = https://minio.chtotib.ru (или https://ais.chtotib.ru/minio,
+    // если minio проксируется под path). Если не задан — подпись делается тем же
+    // внутренним клиентом, и presigned URL пойдёт на http://minio:9000 (mixed-content).
+    const publicUrl = cfg.get<string>('MINIO_PUBLIC_URL', '').trim();
+    if (publicUrl) {
+      try {
+        const u = new URL(publicUrl);
+        this.publicClient = new Client({
+          endPoint: u.hostname,
+          port: u.port ? Number(u.port) : u.protocol === 'https:' ? 443 : 80,
+          useSSL: u.protocol === 'https:',
+          accessKey: cfg.getOrThrow<string>('MINIO_ACCESS_KEY'),
+          secretKey: cfg.getOrThrow<string>('MINIO_SECRET_KEY'),
+          // path-style adressing: presigned URL содержит /<bucket>/<key>.
+          // path-prefix (если minio за nginx /minio/) — minio JS-клиент его сам не знает,
+          // поэтому используем хост как «корень». Если нужен под-path, поднимай
+          // отдельный subdomain minio.chtotib.ru.
+        });
+        this.logger.log(`MinIO presign endpoint: ${publicUrl}`);
+      } catch (e) {
+        this.logger.warn(`MINIO_PUBLIC_URL некорректен (${(e as Error).message}), использую внутренний.`);
+        this.publicClient = this.client;
+      }
+    } else {
+      this.publicClient = this.client;
+    }
   }
 
   async onModuleInit(): Promise<void> {
@@ -56,15 +86,12 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
     ttlSeconds = 3600,
     inline = true,
   ): Promise<string> {
-    // По умолчанию форсим inline-отдачу: квитанции и фото нужно открывать в
-    // соседней вкладке, а не скачивать как файл. Если когда-нибудь понадобится
-    // именно download — передайте inline=false.
     if (inline) {
-      return this.client.presignedGetObject(bucket, key, ttlSeconds, {
+      return this.publicClient.presignedGetObject(bucket, key, ttlSeconds, {
         'response-content-disposition': 'inline',
       });
     }
-    return this.client.presignedGetObject(bucket, key, ttlSeconds);
+    return this.publicClient.presignedGetObject(bucket, key, ttlSeconds);
   }
 
   getPresignedPutUrl(
@@ -72,7 +99,7 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
     key: string,
     ttlSeconds = 3600,
   ): Promise<string> {
-    return this.client.presignedPutObject(bucket, key, ttlSeconds);
+    return this.publicClient.presignedPutObject(bucket, key, ttlSeconds);
   }
 
   async deleteObject(bucket: string, key: string): Promise<void> {
