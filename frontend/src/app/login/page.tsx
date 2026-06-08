@@ -84,15 +84,13 @@ export default function LoginPage() {
             <div className="field">
               <span className="field__label mono" style={{ fontSize: '11px' }}>ЛОГИН</span>
               <input
-                className="input"
-                style={{ height: '56px', fontSize: '16px' }}
+                className="input auth-form__input"
                 type="text"
                 autoComplete="username"
-                inputMode="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="доменный логин или email"
+                placeholder="login@chtotib.ru"
               />
             </div>
 

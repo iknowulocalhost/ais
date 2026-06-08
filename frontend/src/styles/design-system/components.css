@@ -1239,6 +1239,20 @@
   gap: var(--s-7);
 }
 
+/* Лого: ограничиваем высоту до 200px, чтобы не вылезало за пределы бренд-панели. */
+.auth__brand > header svg {
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 200px;
+}
+
+/* Контент бренд-панели лежит поверх фоновой grain-сетки (::before). */
+.auth__brand > * {
+  position: relative;
+  z-index: 1;
+}
+
 .auth__brand::before {
   content: "";
   position: absolute;
