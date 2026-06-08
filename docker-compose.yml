@@ -180,7 +180,9 @@ services:
       - backend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      # Пустое значение по умолчанию = same-origin. Если фронт и бэк на одном
+      # домене (https://ais.chtotib.ru), next.config.js сам проксирует /api/* в backend.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
       PORT: 3000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

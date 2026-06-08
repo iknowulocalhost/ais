@@ -1,8 +1,11 @@
 const ACCESS_KEY = 'ais.access';
 const REFRESH_KEY = 'ais.refresh';
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'http://localhost:3001';
+// По умолчанию — same-origin (пустая строка). next.config.js делает rewrite
+// /api/* → backend, поэтому на проде запрос идёт через тот же HTTPS-домен
+// и mixed-content не возникает. Переопределить можно через NEXT_PUBLIC_API_URL
+// для редких случаев, когда фронт и бэк живут на разных доменах.
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 type Unauthorized = () => void;
 
